@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minimi Agent</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <aside id="sidebar" aria-label="Past conversations">
+    <button id="new-chat" type="button">+ New chat</button>
+    <nav id="sessions" aria-live="polite"></nav>
+    <div id="env" class="muted small"></div>
+    <form id="clock-form" hidden>
+      <label for="clock-input" class="small muted">Demo clock (moves "now" to test memory across days)</label>
+      <div class="row">
+        <input id="clock-input" type="datetime-local">
+        <button type="submit">Set</button>
+        <button type="button" id="clock-reset" title="Back to the real time">Real</button>
+      </div>
+    </form>
+  </aside>
+  <main>
+    <header>
+      <button id="toggle-sidebar" type="button" aria-label="Show conversations">&#9776;</button>
+      <span id="now" class="muted small"></span>
+    </header>
+    <section id="log" aria-live="polite" aria-label="Conversation">
+      <div id="empty" class="empty">
+        <h1>Ask me anything.</h1>
+        <p class="muted">I search the web, cite sources with dates, and remember what you asked and when.
+          Later you can ask "what did I ask on Tuesday?" or "is that still correct?".</p>
+      </div>
+    </section>
+    <form id="composer">
+      <label for="input" class="visually-hidden">Message</label>
+      <textarea id="input" rows="1" maxlength="4000" placeholder="Message Minimi" autofocus></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+  </main>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

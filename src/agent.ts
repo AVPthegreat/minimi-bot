@@ -92,7 +92,7 @@ export class Agent {
     const nudge = await checkWatchlist({ ...this.deps, tz: timezone }, sessionId, now, this.watch);
     if (!nudge) return null;
     const messageId = store.addMessage(sessionId, "assistant", nudge.text, now, { intent: "nudge", sources: nudge.sources.map(publicSource) });
-    store.touchSession(sessionId, now, "Update on something you asked");
+    store.touchSession(sessionId, now, ""); // untitled (hidden in the sidebar) until the user writes
     return { messageId, nudge };
   }
 
