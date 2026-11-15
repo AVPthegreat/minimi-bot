@@ -8,17 +8,17 @@ import { rulesRoute, stopwordsTopic } from "../router.ts";
 import type { AnswerInput, LLM, RecheckResult, RouteInput, RoutePlan } from "./types.ts";
 
 const PRODUCT_RE = /\b(?:[A-Z][a-zA-Z]+(?:\s(?:CRM|Workers|Cloud|Hub))?)\b/g;
-const NOT_PRODUCTS = new Set(["I", "What", "Which", "How", "Compare", "Is", "Are", "Has", "Have", "On", "Last", "The", "Tell", "Should", "Give", "Can", "Do", "Does", "Postgres", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "November", "October", "December"]);
+const NOT_PRODUCTS = new Set(["I", "We", "Our", "My", "Me", "It", "Its", "They", "And", "Or", "For", "In", "Of", "What", "Which", "How", "Compare", "Is", "Are", "Has", "Have", "On", "Last", "The", "Tell", "Should", "Give", "Can", "Do", "Does", "Postgres", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "November", "October", "December"]);
 
 export class FakeLLM implements LLM {
   readonly name = "fake (deterministic, offline)";
 
   async route(input: RouteInput): Promise<Omit<RoutePlan, "via">> {
-    const rules = rulesRoute(input.text, input.timePhrases.length > 0, input.history.length > 0);
+    const rules = rulesRoute(input.text, input.timePhrases.length > 0, input.history.length > 0, input.rest);
     if (rules) return rules;
     const products = [...new Set((input.text.match(PRODUCT_RE) ?? []).filter((w) => !NOT_PRODUCTS.has(w)))];
-    const topic = stopwordsTopic(input.text);
-    const queries = products.length >= 2 ? products.slice(0, 4).map((p) => `${p} pricing`) : [topic || input.text];
+    const topic = stopwordsTopic(input.rest);
+    const queries = products.length >= 2 ? products.slice(0, 5).map((p) => `${p} pricing`) : [topic || input.text];
     return { intent: "search", memoryQuery: topic, searchQueries: queries, sinceDays: 0, highStakes: /pric|cost|\$/i.test(input.text) };
   }
 

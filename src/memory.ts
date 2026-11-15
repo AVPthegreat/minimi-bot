@@ -78,7 +78,8 @@ export function toPastTurn(store: Store, m: MessageRow, tz: string, nowMs: numbe
     userMessageId: m.id,
     when: formatLocal(m.created_at, tz, nowMs),
     question: m.content,
-    answer: answer?.content ?? "(no answer was recorded)",
+    // Old citation numbers point at old source lists; drop them so they are never re-linked to new sources.
+    answer: answer ? answer.content.replace(/\s?\[\d{1,2}\]/g, "") : "(no answer was recorded)",
     claims: answer ? store.claimsFor(answer.id) : [],
   };
 }

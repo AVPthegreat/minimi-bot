@@ -23,6 +23,8 @@ export interface RoutePlan {
 
 export interface RouteInput {
   text: string;
+  /** The text with time phrases removed ("Last Tuesday I asked about X" -> "I asked about X"). */
+  rest: string;
   nowLabel: string;
   history: Array<{ role: "user" | "assistant"; content: string }>;
   timePhrases: string[];

@@ -1,0 +1,86 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { Agent, type AgentEvent } from "../src/agent.ts";
+import { Store } from "../src/db.ts";
+import { FakeLLM } from "../src/llm/fake.ts";
+import { FakeSearch } from "../src/search/fake.ts";
+import type { SearchProvider } from "../src/search/types.ts";
+import { FakeClock } from "../src/time.ts";
+import { SCENARIOS, runScenario } from "../eval/scenarios.ts";
+
+// The whole offline eval is part of `npm test`.
+for (const sc of SCENARIOS) {
+  test(`eval scenario: ${sc.name}`, async () => {
+    const reports = await runScenario(sc, (clock) => ({ llm: new FakeLLM(), search: new FakeSearch(clock) }));
+    const failures = reports.flatMap((r) => r.checks.filter((c) => !c.pass).map((c) => `step ${r.step} ("${r.say}"): ${c.name}\n${r.result.text}`));
+    assert.deepEqual(failures, []);
+  });
+}
+
+async function run(agent: Agent, sid: string, text: string, signal?: AbortSignal) {
+  const events: AgentEvent[] = [];
+  for await (const e of agent.chat(sid, text, signal)) events.push(e);
+  await agent.idle();
+  return events;
+}
+
+function setup(search?: SearchProvider) {
+  const clock = new FakeClock("2026-11-10T10:00:00+05:30");
+  const store = new Store(":memory:");
+  const agent = new Agent({ store, llm: new FakeLLM(), search: search ?? new FakeSearch(clock), clock, timezone: "Asia/Kolkata" });
+  return { clock, store, agent };
+}
+
+test("messages are stored with the time they were sent, searches with what they returned", async () => {
+  const { store, agent } = setup();
+  const sid = agent.newSession().id;
+  await run(agent, sid, "How much is the Cloudflare Workers paid plan?");
+  const [user, bot] = store.sessionMessages(sid);
+  assert.equal(user!.created_at, Date.parse("2026-11-10T10:00:00+05:30"));
+  assert.equal(bot!.role, "assistant");
+  const searches = store.searchesFor(user!.id);
+  assert.equal(searches.length, 1);
+  assert.equal(searches[0]!.provider, "fake");
+});
+
+test("when every search fails, the user is told and no prices are invented", async () => {
+  const broken: SearchProvider = { name: "broken", search: async () => { throw new Error("HTTP 503"); } };
+  const { agent } = setup(broken);
+  const events = await run(agent, agent.newSession().id, "How much is the Cloudflare Workers paid plan?");
+  const warning = events.find((e) => e.type === "warning");
+  assert.ok(warning && warning.type === "warning" && /Web search failed/.test(warning.text));
+  const text = events.flatMap((e) => (e.type === "delta" ? [e.text] : [])).join("");
+  assert.doesNotMatch(text, /\$\d/);
+});
+
+test("a stopped answer is still saved (partial) and marked aborted", async () => {
+  const { store, agent } = setup();
+  const sid = agent.newSession().id;
+  const ac = new AbortController();
+  const events: AgentEvent[] = [];
+  for await (const e of agent.chat(sid, "What does Postgres hosting cost on Supabase, Neon and Railway?", ac.signal)) {
+    events.push(e);
+    if (e.type === "delta") ac.abort();
+  }
+  const bot = store.sessionMessages(sid).find((m) => m.role === "assistant")!;
+  assert.equal(JSON.parse(bot.meta).aborted, true);
+  assert.ok(events.some((e) => e.type === "done"));
+});
+
+test("memory spans sessions; FTS input with quotes or operators is safe", async () => {
+  const { clock, agent } = setup();
+  await run(agent, agent.newSession().id, "How much is the Cloudflare Workers paid plan?");
+  clock.set("2026-11-12T10:00:00+05:30");
+  const events = await run(agent, agent.newSession().id, 'What did I ask about "Cloudflare" OR NEAR(x) * ?');
+  const text = events.flatMap((e) => (e.type === "delta" ? [e.text] : [])).join("");
+  assert.match(text, /How much is the Cloudflare Workers paid plan\?/);
+});
+
+test("empty and oversized input", async () => {
+  const { store, agent } = setup();
+  const sid = agent.newSession().id;
+  const [e] = await run(agent, sid, "   ");
+  assert.equal(e!.type, "error");
+  await run(agent, sid, "x".repeat(10000));
+  assert.equal(store.sessionMessages(sid)[0]!.content.length, 4000);
+});

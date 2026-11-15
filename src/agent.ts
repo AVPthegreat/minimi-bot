@@ -118,7 +118,7 @@ export class Agent {
     // A conversation must start with a user turn.
     while (history.length && history[0]!.role !== "user") history.shift();
 
-    const plan = await route(llm, { text, nowLabel, history, timePhrases: parsed.refs.map((r) => r.phrase) });
+    const plan = await route(llm, { text, rest: parsed.rest, nowLabel, history, timePhrases: parsed.refs.map((r) => r.phrase) });
     const routeMs = performance.now() - t0;
     store.updateMessageMeta(userId, { intent: plan.intent });
     yield { type: "route", intent: plan.intent, via: plan.via, queries: plan.searchQueries };
@@ -154,7 +154,7 @@ export class Agent {
           const outcome = await recheckClaims(this.deps, claims, { nowMs: now, maxQueries: 5, newsSinceDays: sinceDays, signal });
           runs.push(...outcome.runs);
           sources = outcome.sources;
-          const table = renderDiffTable(outcome.rows, thenLabel, formatCivil(civilDateOf(now, tz)));
+          const table = renderDiffTable(outcome.rows, thenLabel, formatCivil(civilDateOf(now, tz), civilDateOf(now, tz)));
           diff = { rows: outcome.rows, table, thenLabel };
           recheckToSave = outcome;
           const changed = outcome.rows.filter((r) => r.status === "changed").length;

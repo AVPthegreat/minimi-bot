@@ -28,7 +28,7 @@ intent:
 - "verify": the user asks whether an earlier answer or earlier facts are still true, or what changed since an earlier conversation.
 - "search": anything that needs current or factual information from the web.
 
-search_queries (only for "search"): 1 query for a simple fact; for comparisons one query per product (max 4). Make them specific: product names, the attribute ("pricing", "changelog", "release notes"), and the current year when freshness matters. Resolve pronouns using the history. Empty for other intents.
+search_queries (only for "search"): 1 query for a simple fact; for comparisons one query per product (max 5). Make them specific: product names, the attribute ("pricing", "changelog", "release notes"), and the current year when freshness matters. Resolve pronouns using the history. Empty for other intents.
 since_days: for questions about recent news or "what's new", how many days back to search (e.g. 7); otherwise 0.
 memory_query: for recall/verify, the topic words to find the earlier conversation (e.g. "postgres hosting"); otherwise "".
 high_stakes: true if a wrong number would cost the user money, health or legal trouble (prices, doses, taxes, contracts).`;

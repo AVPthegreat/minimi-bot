@@ -12,7 +12,7 @@ const RECALL =
   /\b(what (did|have) (i|we) (ask|asked|say|said|talk|talked|discuss|discussed)|did i (ask|mention|say)|when did i (ask|mention)|what (was|were) (my|our) (question|questions)|what did you (say|tell|answer|recommend)|remind me what|what have we (talked|discussed))\b/i;
 
 const VERIFY =
-  /\b(still (correct|true|accurate|valid|right|the case|current)|(has|have|did) (anything|any of (them|these|those)|it|they|the (price|pricing|prices))[\w\s]{0,30}\b(chang|updat|ship|launch|releas)|chang\w* since|(any|anything) (new|changes?|updates?)\b[\w\s]{0,20}\bsince|since then|up to date|out of date|outdated|re-?check|double[- ]check|verify (that|this|it|your))/i;
+  /\b(still (correct|true|accurate|valid|right|the case|current)|(has|have|did) (anything|any of (them|these|those)|it|they|(the |any |their |its )?(price|pricing|prices|plan|plans))[\w\s]{0,30}\b(chang|updat|ship|launch|releas)|chang\w* since|(any|anything) (new|changes?|updates?)\b[\w\s]{0,20}\bsince|since then|up to date|out of date|outdated|re-?check|double[- ]check|verify (that|this|it|your))/i;
 
 const UPDATES = /^\s*(any|anything|what'?s|whats|what is)\s+(new|updates?|changed?)\b[\s\w]{0,25}\??\s*$/i;
 
@@ -21,7 +21,7 @@ const PAST_POINTER =
 
 export function stopwordsTopic(text: string): string {
   return text
-    .replace(/[^\p{L}\p{N}\s.+-]/gu, " ")
+    .replace(/[^\p{L}\p{N}\s+-]/gu, " ")
     .split(/\s+/)
     .filter((w) => w.length > 1 && !TOPIC_STOP.has(w.toLowerCase()))
     .join(" ")
@@ -39,8 +39,8 @@ const TOPIC_STOP = new Set(
 );
 
 /** Rules-only routing. Returns null when the rules are not sure (the model decides then). */
-export function rulesRoute(text: string, hasTimeRef: boolean, hasHistory: boolean): Omit<RoutePlan, "via"> | null {
-  const topic = stopwordsTopic(text);
+export function rulesRoute(text: string, hasTimeRef: boolean, hasHistory: boolean, rest = text): Omit<RoutePlan, "via"> | null {
+  const topic = stopwordsTopic(rest);
   if (CHITCHAT.test(text)) {
     return { intent: "chat", memoryQuery: "", searchQueries: [], sinceDays: 0, highStakes: false };
   }
@@ -70,19 +70,20 @@ export function fallbackRoute(text: string): Omit<RoutePlan, "via"> {
   };
 }
 
+/** One query per product in a comparison; five covers a typical shortlist. */
+export const MAX_QUERIES = 5;
+
 export async function route(
   llm: LLM,
   input: RouteInput,
   opts: { timeoutMs?: number } = {},
 ): Promise<RoutePlan> {
-  const rules = rulesRoute(input.text, input.timePhrases.length > 0, input.history.length > 0);
+  const rules = rulesRoute(input.text, input.timePhrases.length > 0, input.history.length > 0, input.rest);
   if (rules) return { ...rules, via: "rules" };
   try {
     const plan = await withTimeout(llm.route(input), opts.timeoutMs ?? 4000);
-    const queries = [...new Set(plan.searchQueries.map((q) => q.trim()).filter(Boolean))].slice(0, 4);
-    if ((plan.intent === "search" || plan.intent === "verify") && queries.length === 0 && plan.intent === "search") {
-      queries.push(input.text.slice(0, 300));
-    }
+    const queries = [...new Set(plan.searchQueries.map((q) => q.trim()).filter(Boolean))].slice(0, MAX_QUERIES);
+    if (plan.intent === "search" && queries.length === 0) queries.push(input.text.slice(0, 300));
     return { ...plan, searchQueries: queries, via: "model" };
   } catch {
     return { ...fallbackRoute(input.text), via: "fallback" };
