@@ -1,7 +1,23 @@
 // All runtime settings in one place, read once from the environment (.env is loaded if present).
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { parseEnv } from "node:util";
 
-if (existsSync(".env")) process.loadEnvFile(".env");
+/** The project's .env (next to package.json), whatever directory the process was started from. */
+const ENV_FILE = fileURLToPath(new URL("../.env", import.meta.url));
+export const envFileFound = existsSync(ENV_FILE);
+/** Variable names (never values) defined in .env, for the "why am I in fake mode?" message. */
+let envFileNames: string[] = [];
+let envFileBytes = 0;
+if (envFileFound) {
+  envFileBytes = readFileSync(ENV_FILE).length;
+  envFileNames = Object.keys(parseEnv(readFileSync(ENV_FILE, "utf8")));
+  // Values from the file fill variables that are unset or empty in the environment; a non-empty
+  // value already in the environment wins (so `FAKE_MODE=1 npm run dev` works as expected).
+  for (const [k, v] of Object.entries(parseEnv(readFileSync(ENV_FILE, "utf8")))) {
+    if (!process.env[k]) process.env[k] = v;
+  }
+}
 
 function env(name: string, fallback = ""): string {
   const v = process.env[name];
@@ -44,7 +60,7 @@ export function loadConfig(): Config {
   const forcedFake = env("FAKE_MODE") === "1";
   // Only the Anthropic key is required: without a Tavily key, search runs on Anthropic's web_search tool.
   const fakeMode = forcedFake || !anthropicKey;
-  const fakeReason = forcedFake ? "FAKE_MODE=1" : !anthropicKey ? "missing ANTHROPIC_API_KEY" : "";
+  const fakeReason = forcedFake ? "FAKE_MODE=1" : !anthropicKey ? `missing ANTHROPIC_API_KEY (.env ${envFileFound ? `found (${envFileBytes} bytes); it sets: ${envFileNames.join(", ") || "no variables (expected lines like NAME=value)"}` : "not found"})` : "";
   const wanted = env("SEARCH_PROVIDER", "auto");
   if (!["auto", "tavily", "anthropic"].includes(wanted)) throw new Error(`SEARCH_PROVIDER must be auto, tavily or anthropic (got "${wanted}")`);
   if (wanted === "tavily" && !tavilyKey && !fakeMode) throw new Error("SEARCH_PROVIDER=tavily needs TAVILY_API_KEY");
