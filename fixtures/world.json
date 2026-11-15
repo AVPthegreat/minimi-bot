@@ -1,0 +1,105 @@
+{
+  "_about": "A small, fictional-but-plausible web for FAKE_MODE and the offline eval. Each page is visible from `from` until `to` (by the injected clock), so prices can change between days. Numbers here are test fixtures, not real prices.",
+  "pages": [
+    {
+      "url": "https://supabase.com/pricing",
+      "title": "Pricing | Supabase",
+      "published": "2026-10-01",
+      "from": "2026-01-01",
+      "text": "Supabase: the Pro plan costs $25 per month. Includes 8 GB database and daily backups. Supabase: the Team plan costs $599 per month."
+    },
+    {
+      "url": "https://neon.com/pricing",
+      "title": "Neon Pricing - Serverless Postgres",
+      "published": "2026-09-20",
+      "from": "2026-01-01",
+      "to": "2026-11-14",
+      "text": "Neon: the Launch plan costs $19 per month. Neon: the Scale plan costs $69 per month. Autoscaling and branching included."
+    },
+    {
+      "url": "https://neon.com/pricing",
+      "title": "Neon Pricing - Serverless Postgres",
+      "published": "2026-11-14",
+      "from": "2026-11-14",
+      "text": "Neon: the Launch plan costs $15 per month. Neon: the Scale plan costs $69 per month. New lower Launch price from 14 November 2026."
+    },
+    {
+      "url": "https://neon.com/blog/launch-plan-price-cut",
+      "title": "We cut the Launch plan price",
+      "published": "2026-11-14",
+      "from": "2026-11-14",
+      "text": "Neon: the Launch plan costs $15 per month, down from $19, effective 14 November 2026. Postgres hosting news."
+    },
+    {
+      "url": "https://railway.com/pricing",
+      "title": "Railway Pricing - Postgres hosting",
+      "published": "2026-08-02",
+      "from": "2026-01-01",
+      "text": "Railway: the Hobby plan costs $5 per month. Usage-based Postgres hosting on top."
+    },
+    {
+      "url": "https://www.example-dev-blog.com/postgres-hosting-2026",
+      "title": "Best managed Postgres hosting in 2026",
+      "published": "2026-10-28",
+      "from": "2026-01-01",
+      "text": "A roundup of Postgres hosting: Supabase, Neon and Railway compared on price, branching and backups."
+    },
+    {
+      "url": "https://www.hubspot.com/pricing/sales",
+      "title": "Sales Hub Pricing | HubSpot",
+      "published": "2026-10-15",
+      "from": "2026-01-01",
+      "text": "HubSpot: the Sales Hub Starter plan costs $20 per seat per month. CRM for sales teams."
+    },
+    {
+      "url": "https://www.hubspot.com/company-news/breeze-sales-agents",
+      "title": "HubSpot launches Breeze sales agents for every Sales Hub tier",
+      "published": "2026-11-10",
+      "from": "2026-11-10",
+      "text": "HubSpot shipped Breeze sales agents on 10 November 2026: AI agents that draft follow-ups and update deals. Big CRM launch for sales teams."
+    },
+    {
+      "url": "https://www.pipedrive.com/en/pricing",
+      "title": "Pipedrive pricing plans",
+      "published": "2026-09-01",
+      "from": "2026-01-01",
+      "to": "2026-11-11",
+      "text": "Pipedrive: the Advanced plan costs $34 per seat per month. CRM for small sales teams."
+    },
+    {
+      "url": "https://www.pipedrive.com/en/pricing",
+      "title": "Pipedrive pricing plans",
+      "published": "2026-11-11",
+      "from": "2026-11-11",
+      "text": "Pipedrive: the Advanced plan costs $39 per seat per month. CRM for small sales teams. Prices updated 11 November 2026."
+    },
+    {
+      "url": "https://www.salesforce.com/sales/pricing/",
+      "title": "Sales Cloud Pricing | Salesforce",
+      "published": "2026-07-01",
+      "from": "2026-01-01",
+      "text": "Salesforce: the Starter Suite plan costs $25 per user per month. CRM for sales teams."
+    },
+    {
+      "url": "https://www.zoho.com/crm/zohocrm-pricing.html",
+      "title": "Zoho CRM Pricing",
+      "published": "2026-06-10",
+      "from": "2026-01-01",
+      "text": "Zoho CRM: the Standard plan costs $14 per user per month. CRM for sales teams."
+    },
+    {
+      "url": "https://www.close.com/pricing",
+      "title": "Close CRM Pricing",
+      "published": "2026-08-20",
+      "from": "2026-01-01",
+      "text": "Close: the Startup plan costs $49 per seat per month. CRM for sales teams that call and email."
+    },
+    {
+      "url": "https://developers.cloudflare.com/workers/platform/pricing/",
+      "title": "Pricing - Cloudflare Workers docs",
+      "published": "2026-05-01",
+      "from": "2026-01-01",
+      "text": "Cloudflare Workers: the Paid plan costs $5 per month. Includes 10 million requests."
+    }
+  ]
+}
