@@ -20,22 +20,21 @@ async function showNudge(): Promise<void> {
   if (n) console.log(`\n${n.nudge.text}\n${n.nudge.sources.map((s) => dim(`  [${s.n}] ${s.url}`)).join("\n")}\n`);
 }
 
-for (;;) {
-  let line: string;
-  try {
-    line = (await rl.question("> ")).trim();
-  } catch {
-    break; // stdin closed
-  }
-  if (!line) continue;
+rl.setPrompt("> ");
+rl.prompt();
+// Reading lines as a stream works both interactively and with piped input (scripts, demos).
+for await (const raw of rl) {
+  const line = raw.trim();
   if (line === "/quit" || line === "/exit") break;
+  if (!line) {
+    rl.prompt();
+    continue;
+  }
   if (line === "/new") {
     sessionId = agent.newSession().id;
     console.log(dim("(new session)"));
     await showNudge();
-    continue;
-  }
-  if (line.startsWith("/time")) {
+  } else if (line.startsWith("/time")) {
     if (!clock || !config.allowClockOverride) console.log(dim("The demo clock is off (fake mode or ALLOW_CLOCK_OVERRIDE=1)."));
     else {
       try {
@@ -45,16 +44,17 @@ for (;;) {
         console.log(dim((e as Error).message));
       }
     }
-    continue;
+  } else {
+    for await (const ev of agent.chat(sessionId, line)) {
+      if (ev.type === "status") console.log(dim(`  ${ev.text}`));
+      else if (ev.type === "delta") process.stdout.write(ev.text);
+      else if (ev.type === "warning") console.log(`\n  ! ${ev.text}`);
+      else if (ev.type === "error") console.log(`\n  error: ${ev.message}`);
+      else if (ev.type === "sources") process.stdout.write(dim(ev.sources.map((s) => `  [${s.n}] ${s.domain}${s.date ? ` (${s.date})` : ""}`).join("\n")) + "\n\n");
+      else if (ev.type === "done") console.log(dim(`\n  (${ev.atLabel}, first token ${ev.timings.firstTokenMs ?? "-"} ms, total ${ev.timings.totalMs} ms)\n`));
+    }
   }
-  for await (const ev of agent.chat(sessionId, line)) {
-    if (ev.type === "status") console.log(dim(`  ${ev.text}`));
-    else if (ev.type === "delta") process.stdout.write(ev.text);
-    else if (ev.type === "warning") console.log(`\n  ! ${ev.text}`);
-    else if (ev.type === "error") console.log(`\n  error: ${ev.message}`);
-    else if (ev.type === "sources") process.stdout.write(dim(ev.sources.map((s) => `  [${s.n}] ${s.domain}${s.date ? ` (${s.date})` : ""}`).join("\n")) + "\n\n");
-    else if (ev.type === "done") console.log(dim(`\n  (${ev.atLabel}, first token ${ev.timings.firstTokenMs ?? "-"} ms, total ${ev.timings.totalMs} ms)\n`));
-  }
+  rl.prompt();
 }
 rl.close();
 await agent.idle();
