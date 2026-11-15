@@ -52,7 +52,13 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     // clock. Browsers cannot send application/json cross-origin without a preflight we never answer, and
     // we also reject any foreign Origin outright.
     const origin = req.headers.origin;
-    if (origin && new URL(origin).host !== req.headers.host) throw new HttpError(403, "Cross-origin requests are not allowed.");
+    let originHost: string | null = null;
+    try {
+      originHost = origin ? new URL(origin).host : null;
+    } catch {
+      originHost = "invalid";
+    }
+    if (originHost !== null && originHost !== req.headers.host) throw new HttpError(403, "Cross-origin requests are not allowed.");
     if (!(req.headers["content-type"] ?? "").startsWith("application/json")) throw new HttpError(415, "Send JSON (content-type: application/json).");
   }
 
