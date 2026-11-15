@@ -208,12 +208,21 @@ export async function runScenario(
   const clock = new FakeClock(scenario.steps[0]!.at);
   const { llm, search } = make(clock);
   let searchCount = 0;
+  // Counts searches without changing how the provider is used (batching stays batching).
   const counting: SearchProvider = {
     name: search.name,
     search: (q, o) => {
       searchCount++;
       return search.search(q, o);
     },
+    ...(search.searchBatch
+      ? {
+          searchBatch: (items: Parameters<NonNullable<SearchProvider["searchBatch"]>>[0], signal?: AbortSignal) => {
+            searchCount += items.length;
+            return search.searchBatch!(items, signal);
+          },
+        }
+      : {}),
   };
   const store = new Store(":memory:");
   const agent = new Agent({ store, llm, search: counting, clock, timezone: opts.timezone ?? "Asia/Kolkata", watch: { enabled: true, afterDays: 3, maxSearches: 3 } });
