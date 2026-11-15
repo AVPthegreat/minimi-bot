@@ -34,11 +34,11 @@ price in the answer is matched against the evidence and unmatched ones are flagg
 rendered by code from stored values, so a model can't misquote a number in it. Unverifiable facts say "couldn't
 verify", never carry the old value forward. Search failure is reported, not papered over.
 
-**The right moment.** Every stated fact is tracked. When you open a new chat, the agent re-checks up to 3 subjects
+**The right moment.** Every checkable fact in a web answer (up to 12 per answer) is tracked. When you open a new chat, the agent re-checks up to 3 subjects
 whose facts are older than 3 days (cached: a fact checked recently is skipped). If one changed, the chat opens with
 one line ("Neon Launch plan: $19 then, $15 now, source dated 14 Nov"); otherwise it stays silent. The same change is
 never announced twice; others wait for "anything new?". An assistant that pings "no news" gets ignored. Optional
-(`WATCH_ENABLED`), bounded (`WATCH_MAX_SEARCHES`), and the check never delays the chat (12 s cap, off the request path).
+(`WATCH_ENABLED`), bounded (`WATCH_MAX_SEARCHES`), off the request path (12 s cap), and dropped if you start typing first.
 
 ## Key decisions
 
@@ -54,12 +54,12 @@ never announced twice; others wait for "anything new?". An assistant that pings 
 Models: `claude-opus-5-5` writes answers (streamed; effort `low` for chat/recall, `medium` for web; server-side refusal
 fallback on); `claude-haiku-5-5` routes, extracts claims and reads re-checked values with JSON-schema outputs.
 
-## Latency budget (target, search turn)
+## Latency budget (targets for a search turn; measured per turn in the UI and by `eval:live`)
 
 Rules route 0 ms, or model route ~0.5 s · searches in parallel ~1 s (Tavily) / ~3-6 s (Anthropic web_search: one
 model call per query) · first answer token ~1 s later · claim extraction after the answer, off the critical path.
 Chat and recall: first token in ~1 s (no search). Verify: the code-rendered table streams before the model starts.
-Measured numbers per turn are in the UI and in `npm run eval:live`.
+Known cost: an unsure message waits for the router model (capped at 4 s) before searching.
 
 ## Evaluation
 
@@ -75,4 +75,4 @@ real models with a spend cap and skips only the checks that depend on fixture pr
    for high-stakes numbers. 2. A real background scheduler (macOS launch agent) so nudges arrive at a good moment
    instead of on chat open, plus "stop tracking this". 3. Embeddings as a second recall signal for paraphrases
    ("database host" vs "Postgres hosting"). 4. A live eval set graded by a judge model, run nightly, with latency
-   percentiles. 5. Conversation summaries for long sessions; user-level settings (timezone from the browser).
+   percentiles. 5. Start a speculative search in parallel with the router call; conversation summaries for long sessions.

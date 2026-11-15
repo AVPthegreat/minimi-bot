@@ -23,8 +23,9 @@ export function topicTerms(query: string): string[] {
 
 function isContentTurn(m: MessageRow): boolean {
   // A question that was itself about memory ("what did I ask...") is a poor match for "what did I ask".
+  // Chat turns stay in (a user may simply state their shortlist); a stated fact is still something they said.
   const intent = (JSON.parse(m.meta) as { intent?: string }).intent;
-  return intent !== "recall" && intent !== "chat";
+  return intent !== "recall";
 }
 
 export function recall(
@@ -37,7 +38,8 @@ export function recall(
   const toTurns = (rows: MessageRow[]) => rows.slice(0, limit).map((m) => toPastTurn(store, m, opts.tz, opts.nowMs));
 
   if (opts.refs.length > 0) {
-    const ref = opts.refs[0]!;
+    // "Today, check what I asked last Tuesday": the earlier time is the one being asked about.
+    const ref = opts.refs.find((r) => !/today|this (morning|afternoon|evening)|tonight/i.test(r.phrase)) ?? opts.refs[0]!;
     for (const [i, range] of ref.candidates.entries()) {
       const inRange = store.userMessagesBetween(range.start, range.end, opts.currentMessageId).filter(isContentTurn);
       if (inRange.length === 0) continue;

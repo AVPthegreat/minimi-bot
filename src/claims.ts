@@ -41,10 +41,23 @@ export function parseValue(value: string): ParsedValue {
 }
 
 /** Same value? Numbers compare as numbers (so "$19" == "19 USD"); everything else as normalised text. */
+const BARE_NUMBER = /^\s*\d[\d,]*(?:\.\d+)?\s*$/;
+
+function isMoney(v: string, p: ParsedValue): boolean {
+  return p.currency !== null || /^free$/i.test(v.trim());
+}
+
+/**
+ * Same value? Money compares as money ("$19" == "19 USD", "Free" == "$0"); bare numbers as numbers;
+ * everything else (versions, dates, sizes like "2 GB" vs "2 TB") as normalised text, so a change in
+ * any part of the value counts as a change.
+ */
 export function sameValue(a: string, b: string): boolean {
   const x = parseValue(a);
   const y = parseValue(b);
-  if (x.amount !== null && y.amount !== null) {
+  const numeric = (isMoney(a, x) && isMoney(b, y)) || (BARE_NUMBER.test(a) && BARE_NUMBER.test(b)) ||
+    (isMoney(a, x) && BARE_NUMBER.test(b)) || (BARE_NUMBER.test(a) && isMoney(b, y));
+  if (numeric && x.amount !== null && y.amount !== null) {
     if (x.currency && y.currency && x.currency !== y.currency) return false;
     return Math.abs(x.amount - y.amount) <= 0.005 * Math.max(Math.abs(x.amount), Math.abs(y.amount), 1e-9);
   }

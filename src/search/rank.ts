@@ -62,9 +62,13 @@ export function rankSources(runs: QueryRun[], subjects: string[], nowMs: number,
   runs.forEach((run) => {
     run.results.forEach((r, i) => {
       const key = r.url.replace(/[#?].*$/, "").replace(/\/$/, "");
-      const official = isOfficialFor(r.url, subjects) || OFFICIAL_PATH.test(safePath(r.url));
+      // The vendor's own site is official; a pricing/changelog/docs path on it is the best page there.
+      // Elsewhere such a path only earns a small boost (third-party blogs are not official).
+      const vendor = isOfficialFor(r.url, subjects);
+      const officialPath = OFFICIAL_PATH.test(safePath(r.url));
       let score = (r.score ?? 0.5) + 1 / (i + 2); // provider relevance + position
-      if (official) score += 0.6;
+      if (vendor) score += officialPath ? 0.8 : 0.5;
+      else if (officialPath) score += 0.1;
       if (r.publishedDate) {
         const ageDays = (nowMs - Date.parse(r.publishedDate)) / 86400000;
         if (ageDays >= 0) score += Math.max(0, 0.5 - ageDays / 365); // up to +0.5 for this year's pages
@@ -80,7 +84,7 @@ export function rankSources(runs: QueryRun[], subjects: string[], nowMs: number,
       ...r,
       n: i + 1,
       domain: domainOf(r.url),
-      official: isOfficialFor(r.url, subjects) || OFFICIAL_PATH.test(safePath(r.url)),
+      official: isOfficialFor(r.url, subjects),
       query,
     }));
 }

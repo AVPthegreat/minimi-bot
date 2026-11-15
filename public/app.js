@@ -14,7 +14,8 @@ function inline(s, sources) {
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[\s(])_([^_]+)_(?=[\s).,!?:;]|$)/g, "$1<em>$2</em>")
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-    .replace(/\[(\d{1,2})\]/g, (m, n) => {
+    // Citations: only outside tags (never inside an href built just above).
+    .replace(/\[(\d{1,2})\](?![^<]*>)/g, (m, n) => {
       const src = sources.find((x) => x.n === Number(n));
       return src ? `<a class="cite" href="${esc(src.url)}" target="_blank" rel="noopener noreferrer" title="${esc(src.title)}">[${n}]</a>` : m;
     });
@@ -79,6 +80,7 @@ function addMessage({ role, content = "", atLabel = "", sources = [], warnings =
     },
     setStatus(t) { const s = el.querySelector(".status"); s.hidden = !t; s.textContent = t || ""; },
     setSources(list) {
+      list = list.filter((s) => /^https?:\/\//i.test(s.url)); // never render javascript: or other schemes
       view.sources = list;
       el.querySelector(".sources").innerHTML = list
         .map((s) => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" title="${esc(s.title)}"${s.official ? ' class="official"' : ""}>[${s.n}] ${esc(s.domain)}${s.date ? ` &middot; ${esc(s.date)}` : ""}</a></li>`)

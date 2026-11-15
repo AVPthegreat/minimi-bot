@@ -84,3 +84,33 @@ test("empty and oversized input", async () => {
   await run(agent, sid, "x".repeat(10000));
   assert.equal(store.sessionMessages(sid)[0]!.content.length, 4000);
 });
+
+test("recall uses the earlier time when the message also says 'today'", async () => {
+  const { clock, agent } = setup();
+  await run(agent, agent.newSession().id, "How much is the Cloudflare Workers paid plan?"); // Tue 10 Nov
+  clock.set("2026-11-18T09:00:00+05:30");
+  const events = await run(agent, agent.newSession().id, "Today, tell me what I asked last Tuesday");
+  const text = events.flatMap((e) => (e.type === "delta" ? [e.text] : [])).join("");
+  assert.match(text, /Cloudflare Workers paid plan/);
+});
+
+test("a nudge never lands between a question and its answer", async () => {
+  const { clock, store, agent } = setup();
+  await run(agent, agent.newSession().id, "What does Postgres hosting cost on Supabase, Neon and Railway?");
+  clock.set("2026-11-18T09:00:00+05:30");
+  const sid = agent.newSession().id;
+  const pending = agent.nudge(sid); // starts the background check...
+  await run(agent, sid, "hi"); // ...while the user is already talking
+  assert.equal(await pending, null);
+  assert.deepEqual(store.sessionMessages(sid).map((m) => m.role), ["user", "assistant"]);
+});
+
+test("a stopped turn stores no claims", async () => {
+  const { store, agent } = setup();
+  const ac = new AbortController();
+  for await (const e of agent.chat(agent.newSession().id, "What does Postgres hosting cost on Supabase, Neon and Railway?", ac.signal)) {
+    if (e.type === "sources") ac.abort();
+  }
+  await agent.idle();
+  assert.equal((store.db.prepare("SELECT COUNT(*) AS n FROM claims").get() as { n: number }).n, 0);
+});

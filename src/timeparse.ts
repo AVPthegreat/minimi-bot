@@ -95,6 +95,7 @@ const RULES: Rule[] = [
     // "3 November", "3rd Nov 2026", "on the 3rd of November"
     re: new RegExp(`\\b(?:the\\s+)?(\\d{1,2})(?:st|nd|rd|th)?(?:\\s+of)?\\s+${MONTH_RE}\\b(?:,?\\s+(\\d{4}))?`, "gi"),
     resolve: (m, today, tz) => {
+      if (m[2] === "may") return null; // lowercase "may" is the verb ("I may 2 more")
       const c = pastDate(Number(m[1]), monthFromToken(m[2]!), m[3] ? Number(m[3]) : null, today);
       return c ? { candidates: [dayRange(c, tz, today)] } : null;
     },
@@ -103,6 +104,7 @@ const RULES: Rule[] = [
     // "November 3", "Nov 3rd, 2026"
     re: new RegExp(`\\b${MONTH_RE}\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:,?\\s+(\\d{4}))?`, "gi"),
     resolve: (m, today, tz) => {
+      if (m[1] === "may") return null;
       const c = pastDate(Number(m[2]), monthFromToken(m[1]!), m[3] ? Number(m[3]) : null, today);
       return c ? { candidates: [dayRange(c, tz, today)] } : null;
     },
@@ -161,7 +163,8 @@ const RULES: Rule[] = [
   },
   {
     // "last Tuesday", "on Monday", "this Monday", "Monday", "past Friday"
-    re: new RegExp(`\\b(?:(last|past|this|on|previous)\\s+)?${WEEKDAY_RE}\\b`, "gi"),
+    // `(?!\\.\\w)`: "Monday.com" is a product, not a day.
+    re: new RegExp(`\\b(?:(last|past|this|on|previous)\\s+)?${WEEKDAY_RE}\\b(?!\\.\\w)`, "gi"),
     resolve: (m, today, tz) => {
       const qualifier = (m[1] ?? "").toLowerCase();
       const target = weekdayFromToken(m[2]!);

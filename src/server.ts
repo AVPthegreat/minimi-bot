@@ -47,6 +47,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   const url = new URL(req.url ?? "/", "http://localhost");
   const path = url.pathname;
 
+  if (req.method === "POST") {
+    // Cross-site protection: a page on another site must not be able to spend your API budget or move the
+    // clock. Browsers cannot send application/json cross-origin without a preflight we never answer, and
+    // we also reject any foreign Origin outright.
+    const origin = req.headers.origin;
+    if (origin && new URL(origin).host !== req.headers.host) throw new HttpError(403, "Cross-origin requests are not allowed.");
+    if (!(req.headers["content-type"] ?? "").startsWith("application/json")) throw new HttpError(415, "Send JSON (content-type: application/json).");
+  }
+
   if (req.method === "GET" && path === "/api/health") {
     const now = (clock ?? { now: () => Date.now() }).now();
     return json(res, 200, {

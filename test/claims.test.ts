@@ -47,3 +47,11 @@ test("fixture grammar extracts facts", () => {
     ],
   );
 });
+
+test("non-money values compare as text, so versions, sizes and dates that change are caught", () => {
+  assert.ok(!sameValue("2 GB", "2 TB"));
+  assert.ok(!sameValue("18.1.0", "18.1.5"));
+  assert.ok(!sameValue("2026-11-03", "2026-12-01"));
+  assert.ok(sameValue("20", "20"));
+  assert.ok(sameValue("$20", "20"));
+});

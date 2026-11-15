@@ -90,7 +90,9 @@ export class Agent {
     if (!store.getSession(sessionId) || store.sessionMessages(sessionId).length > 0) return null;
     const now = clock.now();
     const nudge = await checkWatchlist({ ...this.deps, tz: timezone }, sessionId, now, this.watch);
-    if (!nudge) return null;
+    // The check took a while: if the user started talking meanwhile, drop the nudge rather than wedge it
+    // between their question and its answer. (node:sqlite is synchronous, so check-then-insert is atomic.)
+    if (!nudge || store.sessionMessages(sessionId).length > 0) return null;
     const messageId = store.addMessage(sessionId, "assistant", nudge.text, now, { intent: "nudge", sources: nudge.sources.map(publicSource) });
     store.touchSession(sessionId, now, ""); // untitled (hidden in the sidebar) until the user writes
     return { messageId, nudge };
@@ -209,6 +211,7 @@ export class Agent {
       yield { type: "delta", text: prefix };
     }
     try {
+      if (signal?.aborted) throw new Error("stopped");
       for await (const chunk of llm.streamAnswer({
         intent: intent === "updates" ? "verify" : intent,
         question: text,
@@ -245,6 +248,7 @@ export class Agent {
     );
     for (const w of warnings) yield { type: "warning", text: w };
 
+    const stopped = signal?.aborted ?? false;
     const doneAt = clock.now();
     const timings: Timings = {
       routeMs: Math.round(routeMs),
@@ -252,7 +256,7 @@ export class Agent {
       firstTokenMs: firstTokenMs === null ? null : Math.round(firstTokenMs),
       totalMs: Math.round(performance.now() - t0),
     };
-    const assistantId = store.addMessage(sessionId, "assistant", answer || "(no answer)", doneAt, {
+    const assistantId = store.addMessage(sessionId, "assistant", answer || (stopped ? "(stopped)" : "(no answer)"), doneAt, {
       intent,
       via: plan.via,
       replyTo: userId,
@@ -260,13 +264,14 @@ export class Agent {
       warnings,
       notes,
       timings,
-      aborted: signal?.aborted ?? false,
+      aborted: stopped,
     });
     store.touchSession(sessionId, doneAt, text.slice(0, 80));
-    if (recheckToSave) saveRecheck(store, recheckToSave, assistantId, sessionId, doneAt);
+    // A stopped turn keeps its partial text but teaches memory nothing (no re-check versions, no claims).
+    if (recheckToSave && !stopped) saveRecheck(store, recheckToSave, assistantId, sessionId, doneAt);
 
     // ---- Remember the checkable facts of new answers, off the critical path.
-    if ((intent === "search" || (intent === "verify" && !recheckToSave)) && sources.length && answer) {
+    if (!stopped && (intent === "search" || (intent === "verify" && !recheckToSave)) && sources.length && answer) {
       this.background(
         llm.extractClaims({ question: text, answer, sources }).then((claims) => {
           const known = claims.filter((c) => c.subject && c.attribute && c.value);

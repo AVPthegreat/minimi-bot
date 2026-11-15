@@ -78,3 +78,9 @@ test("ordinary words are not dates ('sat', 'may', 'sun')", () => {
 test("rest removes the time phrases", () => {
   assert.equal(parseTimeRefs("Last Tuesday I asked about Postgres hosting", WED, TZ).rest, "I asked about Postgres hosting");
 });
+
+test("product names and verbs are not dates: Monday.com, 'I may 2 more'", () => {
+  assert.deepEqual(days("Compare HubSpot and Monday.com pricing"), []);
+  assert.deepEqual(days("I may 2 more seats"), []);
+  assert.deepEqual(days("on May 2"), [["2026-05-02..2026-05-02"]]);
+});

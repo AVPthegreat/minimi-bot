@@ -1,6 +1,6 @@
 // Every prompt the agent sends, in one file, so they can be read and reviewed together.
-// System prompts are fixed strings (cacheable); anything that changes per turn (date, sources,
-// memory) goes into the user turn.
+// System prompts are fixed strings, so the prefix stays byte-stable; anything that changes per turn
+// (date, sources, memory) goes into the user turn.
 
 import type { AnswerInput, RouteInput } from "./types.ts";
 import type { ClaimRow } from "../db.ts";

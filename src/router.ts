@@ -9,7 +9,7 @@ const CHITCHAT =
   /^\s*(hi|hello|hey|yo|hiya|thanks|thank you|thx|ok|okay|cool|great|nice|good (morning|afternoon|evening|night)|bye|see you|who are you|what can you do)\b[\s!.?,a-z]{0,20}$/i;
 
 const RECALL =
-  /\b(what (did|have) (i|we) (ask|asked|say|said|talk|talked|discuss|discussed)|did i (ask|mention|say)|when did i (ask|mention)|what (was|were) (my|our) (question|questions)|what did you (say|tell|answer|recommend)|remind me what|what have we (talked|discussed))\b/i;
+  /\b(what (did|have) (i|we) (ask|asked|say|said|talk|talked|discuss|discussed)|what (i|we) (asked|said|talked about|discussed)|did i (ask|mention|say)|when did i (ask|mention)|what (was|were) (my|our) (question|questions)|what did you (say|tell|answer|recommend)|remind me what|what have we (talked|discussed))\b/i;
 
 const VERIFY =
   /\b(still (correct|true|accurate|valid|right|the case|current)|(has|have|did) (anything|any of (them|these|those)|it|they|(the |any |their |its )?(price|pricing|prices|plan|plans))[\w\s]{0,30}\b(chang|updat|ship|launch|releas)|chang\w* since|(any|anything) (new|changes?|updates?)\b[\w\s]{0,20}\bsince|since then|up to date|out of date|outdated|re-?check|double[- ]check|verify (that|this|it|your))/i;
