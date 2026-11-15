@@ -117,16 +117,80 @@ export function moneyIn(text: string): string[] {
   return [...new Set(text.match(MONEY_RE) ?? [])].map((s) => s.trim());
 }
 
+interface PriceMention {
+  text: string; // "$19"
+  amount: number;
+  currency: string | null;
+  context: Set<string>; // words naming what the price belongs to ("neon", "launch")
+}
+
+const CONTEXT_STOP = new Set(
+  "the a an and or of for to in on at is are was were be it its this that with from per month monthly year yearly annual annually user users seat seats plan plans price prices pricing cost costs now then today was currently starts starting from up down only about around just new old source dated changed unchanged".split(" "),
+);
+
+function contextWords(s: string): Set<string> {
+  return new Set(
+    s
+      .toLowerCase()
+      .replace(/\[\d+\]|https?:\/\/\S+/g, " ")
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 3 && !CONTEXT_STOP.has(w) && !/^\d+$/.test(w)),
+  );
+}
+
+/** Each price with the words just before it on the same line, back to the previous price. */
+function priceMentions(text: string): PriceMention[] {
+  const out: PriceMention[] = [];
+  for (const line of text.split(/\n|(?<=[.!?])\s+/)) {
+    let from = 0;
+    for (const m of line.matchAll(new RegExp(MONEY_RE.source, "gi"))) {
+      const v = parseValue(m[0]);
+      if (v.amount === null) continue;
+      // For table rows the whole row is the context (the subject sits in the first cell).
+      const context = line.trimStart().startsWith("|") ? line : line.slice(from, m.index);
+      out.push({ text: m[0].trim(), amount: v.amount, currency: v.currency, context: contextWords(context) });
+      from = m.index! + m[0].length;
+    }
+  }
+  return out;
+}
+
 /**
- * Prices in `answer` that do not appear anywhere in `evidence` (sources, memory, the diff table).
- * The model is told never to invent prices; this checks it did not, and the UI flags any that slip.
+ * Prices in `answer` that no piece of `evidence` supports. A price is supported when the evidence has
+ * the same amount, in the same currency, said about the same thing (the words before the price share a
+ * product or plan name). "Neon Launch $19" is not supported by "Supabase Pro $19". Callers pass only
+ * current evidence (fresh sources and the computed diff table), so a stale price copied from an old
+ * answer is flagged.
  */
 export function unsupportedPrices(answer: string, evidence: string): string[] {
-  const known = moneyIn(evidence).map(parseValue);
-  return moneyIn(answer).filter((p) => {
-    const v = parseValue(p);
-    return !known.some((k) => k.amount !== null && v.amount !== null && Math.abs(k.amount - v.amount) < 0.005);
+  const known = priceMentions(evidence);
+  const bad = priceMentions(answer).filter((p) => {
+    return !known.some((k) => {
+      if (Math.abs(k.amount - p.amount) >= 0.005) return false;
+      if (p.currency && k.currency && p.currency !== k.currency) return false;
+      if (p.context.size === 0) return true; // "That's $19." refers back; nothing more to compare
+      return [...p.context].some((w) => k.context.has(w));
+    });
   });
+  return [...new Set(bad.map((p) => p.text))];
+}
+
+/** One honest summary line for a re-check: never "nothing changed" unless every row was verified. */
+export function summarizeDiff(rows: DiffRow[], thenLabel: string): string {
+  const count = (s: DiffStatus) => rows.filter((r) => r.status === s).length;
+  const changed = count("changed");
+  const unchanged = count("unchanged");
+  const unverified = count("unverified");
+  if (rows.length && unverified === rows.length) {
+    return `I couldn't verify any of the ${rows.length} fact${rows.length > 1 ? "s" : ""} from ${thenLabel} against current sources.`;
+  }
+  if (changed === 0 && unverified === 0) return `Nothing I checked has changed since ${thenLabel} (${unchanged} of ${rows.length} verified).`;
+  const parts = [
+    changed ? `**${changed} changed**` : "",
+    unchanged ? `${unchanged} unchanged` : "",
+    unverified ? `${unverified} I couldn't verify` : "",
+  ].filter(Boolean);
+  return `Since ${thenLabel}: ${parts.join(", ")}.`;
 }
 
 // ---- A tiny fact grammar used by the fake model (and as a no-model fallback extractor).

@@ -39,7 +39,7 @@ test("messages are stored with the time they were sent, searches with what they 
   assert.equal(user!.created_at, Date.parse("2026-11-10T10:00:00+05:30"));
   assert.equal(bot!.role, "assistant");
   const searches = store.searchesFor(user!.id);
-  assert.equal(searches.length, 1);
+  assert.deepEqual(searches.map((x) => x.purpose).sort(), ["answer", "speculative"]);
   assert.equal(searches[0]!.provider, "fake");
 });
 

@@ -5,14 +5,14 @@
 // Everything the UI, the CLI and the eval use goes through this class.
 
 import { randomUUID } from "node:crypto";
-import { renderDiffTable, unsupportedPrices } from "./claims.ts";
+import { renderDiffTable, summarizeDiff, unsupportedPrices } from "./claims.ts";
 import type { ClaimRow, SessionRow, Store } from "./db.ts";
 import type { AnswerInput, Intent, LLM, PastTurn, RoutePlan } from "./llm/types.ts";
 import { recall, toPastTurn } from "./memory.ts";
 import { dedupeClaims, recheckClaims, saveRecheck } from "./recheck.ts";
-import { route } from "./router.ts";
-import { type QueryRun, type Source, rankSources, runQueries } from "./search/rank.ts";
-import type { SearchProvider } from "./search/types.ts";
+import { route, rulesRoute } from "./router.ts";
+import { type QueryRun, type Source, domainOf, isOfficialFor, rankSources, runQueries } from "./search/rank.ts";
+import type { SearchProvider, SearchResult } from "./search/types.ts";
 import { type Clock, civilDateOf, daysBetween, formatCivil, formatLocal } from "./time.ts";
 import { parseTimeRefs } from "./timeparse.ts";
 import { type Nudge, type WatchConfig, checkWatchlist, dueClaims } from "./watch.ts";
@@ -24,6 +24,8 @@ export interface AgentDeps {
   clock: Clock;
   timezone: string;
   watch?: WatchConfig;
+  /** Web searches the answer model may run itself when prefetched sources fall short (default 3, 0 = off). */
+  maxSelfSearches?: number;
 }
 
 export type AgentEvent =
@@ -53,6 +55,8 @@ export interface Timings {
 }
 
 const HISTORY_TURNS = 8;
+/** While a speculative search is already running, wait at most this long for the router model. */
+const SPECULATIVE_ROUTER_TIMEOUT_MS = 1500;
 const MAX_INPUT = 4000;
 
 export class Agent {
@@ -120,7 +124,18 @@ export class Agent {
     // A conversation must start with a user turn.
     while (history.length && history[0]!.role !== "user") history.shift();
 
-    const plan = await route(llm, { text, rest: parsed.rest, nowLabel, history, timePhrases: parsed.refs.map((r) => r.phrase) });
+    // Speculative prefetch: when the rules can't decide, the message is most likely a web question, so
+    // search for it right away while the router model decides. If the router says no search is needed,
+    // the speculative search is cancelled; if the router is slow, its fallback reuses these results.
+    const routeInput = { text, rest: parsed.rest, nowLabel, history, timePhrases: parsed.refs.map((r) => r.phrase) };
+    const undecided = rulesRoute(text, parsed.refs.length > 0, history.length > 0, parsed.rest) === null;
+    const specQuery = text.slice(0, 300);
+    const specAbort = new AbortController();
+    const spec = undecided
+      ? runQueries(this.deps.search, [{ query: specQuery, purpose: "speculative", opts: { maxResults: 5 } }], signal ? AbortSignal.any([specAbort.signal, signal]) : specAbort.signal)
+      : null;
+    const plan = await route(llm, routeInput, { timeoutMs: spec ? SPECULATIVE_ROUTER_TIMEOUT_MS : 4000 });
+    if (spec && plan.intent !== "search") specAbort.abort();
     const routeMs = performance.now() - t0;
     store.updateMessageMeta(userId, { intent: plan.intent });
     yield { type: "route", intent: plan.intent, via: plan.via, queries: plan.searchQueries };
@@ -159,8 +174,7 @@ export class Agent {
           const table = renderDiffTable(outcome.rows, thenLabel, formatCivil(civilDateOf(now, tz), civilDateOf(now, tz)));
           diff = { rows: outcome.rows, table, thenLabel };
           recheckToSave = outcome;
-          const changed = outcome.rows.filter((r) => r.status === "changed").length;
-          prefix = `${changed ? `**${changed} of ${outcome.rows.length} changed** since ${thenLabel}.` : `Nothing I checked has changed since ${thenLabel}.`}\n\n${table}\n\n`;
+          prefix = `${summarizeDiff(outcome.rows, thenLabel)}\n\n${table}\n\n`;
         } else if (plan.intent === "verify" && memory.length) {
           // The earlier answer had no stored facts: search the earlier question again and let the
           // model compare old answer and fresh sources.
@@ -175,17 +189,23 @@ export class Agent {
 
       if (plan.intent === "search") {
         yield { type: "status", text: `Searching: ${plan.searchQueries.join(" | ")}` };
-        runs.push(
-          ...(await runQueries(
-            this.deps.search,
-            plan.searchQueries.map((q) => ({
-              query: q,
-              purpose: "answer",
-              opts: { maxResults: plan.highStakes ? 6 : 5, ...(plan.sinceDays ? { sinceDays: plan.sinceDays } : {}) },
-            })),
-            signal,
-          )),
-        );
+        // The speculative search already covers the raw question; run only the router's other queries.
+        const extra = plan.searchQueries.filter((q) => !(spec && sameQuery(q, specQuery)));
+        const [specRuns, planRuns] = await Promise.all([
+          spec ?? Promise.resolve([]),
+          extra.length
+            ? runQueries(
+                this.deps.search,
+                extra.map((q) => ({
+                  query: q,
+                  purpose: "answer",
+                  opts: { maxResults: plan.highStakes ? 6 : 5, ...(plan.sinceDays ? { sinceDays: plan.sinceDays } : {}) },
+                })),
+                signal,
+              )
+            : Promise.resolve([]),
+        ]);
+        runs.push(...specRuns, ...planRuns);
         sources = rankSources(runs, plan.searchQueries, now, 8);
       }
     } catch (e) {
@@ -210,9 +230,20 @@ export class Agent {
       firstTokenMs = performance.now() - t0;
       yield { type: "delta", text: prefix };
     }
+    // The answer model may search on its own (bounded) when the prefetched sources fall short; pages it
+    // finds join the numbered source list, and its citations become [n] markers.
+    const selfSearches: string[] = [];
+    const addSource = (r: SearchResult): { source: Source; added: boolean } => {
+      const existing = sources.find((x) => x.url === r.url);
+      if (existing) return { source: existing, added: false };
+      const source: Source = { ...r, n: sources.length + 1, domain: domainOf(r.url), official: isOfficialFor(r.url, plan.searchQueries), query: "(answer model)" };
+      sources.push(source);
+      return { source, added: true };
+    };
+    const maxSelfSearches = intent === "search" || intent === "verify" || intent === "updates" ? (this.deps.maxSelfSearches ?? 3) : 0;
     try {
       if (signal?.aborted) throw new Error("stopped");
-      for await (const chunk of llm.streamAnswer({
+      for await (const ev of llm.streamAnswer({
         intent: intent === "updates" ? "verify" : intent,
         question: text,
         nowLabel,
@@ -222,11 +253,28 @@ export class Agent {
         diff,
         notes,
         highStakes: plan.highStakes,
+        maxSelfSearches,
         signal,
       })) {
-        if (firstTokenMs === null) firstTokenMs = performance.now() - t0;
-        answer += chunk;
-        yield { type: "delta", text: chunk };
+        if (ev.type === "text") {
+          if (firstTokenMs === null) firstTokenMs = performance.now() - t0;
+          answer += ev.text;
+          yield { type: "delta", text: ev.text };
+        } else if (ev.type === "searching") {
+          selfSearches.push(ev.query);
+          yield { type: "status", text: `Searching the web: ${ev.query}` };
+        } else if (ev.type === "source") {
+          if (addSource(ev.result).added) yield { type: "sources", sources: sources.map(publicSource) };
+        } else if (ev.type === "cite") {
+          const { source, added } = addSource({ title: ev.title ?? ev.url, url: ev.url, snippet: "" });
+          if (!source.snippet.includes(ev.citedText)) source.snippet = `${source.snippet} ${ev.citedText}`.trim().slice(0, 2000);
+          if (added) yield { type: "sources", sources: sources.map(publicSource) };
+          const tag = ` [${source.n}]`;
+          if (!answer.endsWith(tag)) {
+            answer += tag;
+            yield { type: "delta", text: tag };
+          }
+        }
       }
     } catch (e) {
       if (!signal?.aborted) {
@@ -235,16 +283,20 @@ export class Agent {
         yield { type: "error", message: (e as Error).message };
       }
     }
+    for (const q of selfSearches) {
+      store.logSearch(userId, q, "answer-model web_search", "self-search", sources.filter((x) => x.query === "(answer model)"), now);
+    }
 
-    // ---- Correctness guard: every price in the answer must appear in the evidence.
+    // ---- Correctness guard: every price in the answer must be backed by CURRENT evidence (fresh sources,
+    // including passages the model cited from its own searches, and the computed diff table). Old answers
+    // are not evidence for today's prices; only a pure recall answer may quote them, as history.
     const evidence = [
-      ...sources.map((s) => `${s.title} ${s.snippet}`),
-      ...memory.map((t) => t.answer),
+      ...sources.map((x) => `${x.title}\n${x.snippet}`),
       diff?.table ?? "",
-      text,
+      ...(intent === "recall" ? memory.map((t) => t.answer) : []),
     ].join("\n");
     const warnings = unsupportedPrices(answer, evidence).map(
-      (p) => `I couldn't match ${p} to any source I was given. Treat it as unverified.`,
+      (p) => `I couldn't match ${p} to a current source. Treat it as unverified.`,
     );
     for (const w of warnings) yield { type: "warning", text: w };
 
@@ -287,6 +339,11 @@ export class Agent {
     const tracked = p.catch((e: Error) => console.error(`[background] ${e.message}`)).finally(() => this.pending.delete(tracked));
     this.pending.add(tracked);
   }
+}
+
+function sameQuery(a: string, b: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return norm(a) === norm(b);
 }
 
 function publicSource(s: Source): PublicSource {

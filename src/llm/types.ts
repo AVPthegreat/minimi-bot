@@ -4,6 +4,7 @@
 import type { ClaimRow, NewClaim } from "../db.ts";
 import type { DiffRow } from "../claims.ts";
 import type { Source } from "../search/rank.ts";
+import type { SearchResult } from "../search/types.ts";
 
 /** "updates" = "anything new?": re-check the whole watchlist (rules-routed only). */
 export type Intent = "chat" | "recall" | "verify" | "search" | "updates";
@@ -50,8 +51,20 @@ export interface AnswerInput {
   /** One-liners the answer must state (e.g. how an ambiguous date was read). */
   notes: string[];
   highStakes: boolean;
+  /**
+   * How many web searches the answer model may run itself when the prefetched sources fall short
+   * (the bounded agent loop). 0 = answer from the given evidence only.
+   */
+  maxSelfSearches: number;
   signal?: AbortSignal;
 }
+
+/** What the answer model streams back: text, plus (when it searches on its own) what it looked up and cited. */
+export type AnswerEvent =
+  | { type: "text"; text: string }
+  | { type: "searching"; query: string }
+  | { type: "source"; result: SearchResult }
+  | { type: "cite"; url: string; title: string | null; citedText: string };
 
 export interface RecheckResult {
   value: string;
@@ -62,7 +75,7 @@ export interface RecheckResult {
 export interface LLM {
   readonly name: string;
   route(input: RouteInput): Promise<Omit<RoutePlan, "via">>;
-  streamAnswer(input: AnswerInput): AsyncIterable<string>;
+  streamAnswer(input: AnswerInput): AsyncIterable<AnswerEvent>;
   extractClaims(input: { question: string; answer: string; sources: Source[] }): Promise<NewClaim[]>;
   /** For each claim, its current value according to `sources` (null = not stated there). */
   recheck(input: { claims: ClaimRow[]; sources: Source[] }): Promise<Array<RecheckResult | null>>;

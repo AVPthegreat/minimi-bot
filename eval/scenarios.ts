@@ -63,7 +63,7 @@ export const SCENARIOS: Scenario[] = [
         say: "What does Postgres hosting cost on Supabase, Neon and Railway?",
         checks: [
           intent("search"),
-          { name: "searches run in parallel, one per product", ok: (r) => r.searches === 3 },
+          { name: "one search per product + the speculative one, in parallel", ok: (r) => r.searches === 4 },
           { name: "cites at least 3 sources", ok: (r) => r.sources.length >= 3 },
           { name: "states Neon's price", offlineOnly: true, ok: has("$19") },
           { name: "facts stored for later re-checks", ok: (_r, { store }) => (store.db.prepare("SELECT COUNT(*) AS n FROM claims").get() as { n: number }).n >= 3 },
@@ -96,7 +96,7 @@ export const SCENARIOS: Scenario[] = [
         at: "2026-11-09T11:00:00+05:30",
         session: "a",
         say: "We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing.",
-        checks: [intent("search"), { name: "one search per CRM (5, in parallel)", ok: (r) => r.searches === 5 }, noUnsupportedPrices],
+        checks: [intent("search"), { name: "one search per CRM + the speculative one (6, in parallel)", ok: (r) => r.searches === 6 }, noUnsupportedPrices],
       },
       {
         at: "2026-11-12T15:00:00+05:30",

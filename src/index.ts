@@ -40,7 +40,10 @@ export interface Built {
 
 /** The model and the search provider the config asks for (fakes when there is no key). */
 export function buildModels(config: Config, clock: Clock, meter: UsageMeter): { llm: LLM; search: SearchProvider } {
-  if (config.fakeMode) return { llm: new FakeLLM(), search: new FakeSearch(clock) };
+  if (config.fakeMode) {
+    const search = new FakeSearch(clock);
+    return { llm: new FakeLLM(search), search };
+  }
   const client = new Anthropic({ apiKey: config.anthropicKey, maxRetries: 2 });
   const llm = new AnthropicLLM({
     client,
@@ -68,6 +71,7 @@ export function createAgent(config: Config = loadConfig()): Built {
     search,
     clock: realClock,
     timezone: config.timezone,
+    maxSelfSearches: config.answerMaxSearches,
     watch: { enabled: config.watchEnabled, afterDays: config.watchAfterDays, maxSearches: config.watchMaxSearches },
   });
   return { agent, clock, config, llm, search, meter };

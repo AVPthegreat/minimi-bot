@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { diffClaim, grammarClaims, parseValue, renderDiffTable, sameValue, unsupportedPrices } from "../src/claims.ts";
+import { diffClaim, grammarClaims, parseValue, renderDiffTable, sameValue, summarizeDiff, unsupportedPrices } from "../src/claims.ts";
 
 test("values compare as numbers when they can", () => {
   assert.ok(sameValue("$19", "19 USD"));
@@ -54,4 +54,26 @@ test("non-money values compare as text, so versions, sizes and dates that change
   assert.ok(!sameValue("2026-11-03", "2026-12-01"));
   assert.ok(sameValue("20", "20"));
   assert.ok(sameValue("$20", "20"));
+});
+
+test("price guard checks the amount, the currency and what the price belongs to", () => {
+  const current = "Neon: the Launch plan costs $15 per month. Supabase: the Pro plan costs $19 per month.";
+  assert.deepEqual(unsupportedPrices("Neon's Launch plan is $19 per month.", current), ["$19"]); // $19 belongs to Supabase
+  assert.deepEqual(unsupportedPrices("Neon's Launch plan is €15 per month.", current), ["€15"]); // wrong currency
+  assert.deepEqual(unsupportedPrices("Neon's Launch plan is $15 per month.", current), []);
+  assert.deepEqual(unsupportedPrices("Supabase Pro is $19 and Neon Launch is $15.", current), []);
+  // Table rows: the subject in the first cell is the context for every price in the row.
+  const table = "| Neon: Launch plan price | $19 per month | $15 per month [1] | **Changed** |";
+  assert.deepEqual(unsupportedPrices("Neon Launch went from $19 to $15.", table), []);
+});
+
+test("re-check summary is honest about what could not be verified", () => {
+  const row = (status: "changed" | "unchanged" | "unverified") => ({ subject: "X", attribute: "a", oldValue: "$1", newValue: status === "unverified" ? null : "$1", status });
+  assert.equal(summarizeDiff([row("unverified"), row("unverified")], "Tue 10 Nov"), "I couldn't verify any of the 2 facts from Tue 10 Nov against current sources.");
+  assert.equal(summarizeDiff([row("unchanged"), row("unchanged")], "Tue 10 Nov"), "Nothing I checked has changed since Tue 10 Nov (2 of 2 verified).");
+  assert.equal(
+    summarizeDiff([row("changed"), row("unchanged"), row("unchanged"), row("unverified"), row("unverified")], "Tue 10 Nov"),
+    "Since Tue 10 Nov: **1 changed**, 2 unchanged, 2 I couldn't verify.",
+  );
+  assert.equal(summarizeDiff([row("unchanged"), row("unverified")], "Tue 10 Nov"), "Since Tue 10 Nov: 1 unchanged, 1 I couldn't verify.");
 });

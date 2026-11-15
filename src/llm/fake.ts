@@ -5,7 +5,8 @@
 import { grammarClaims } from "../claims.ts";
 import type { NewClaim } from "../db.ts";
 import { rulesRoute, stopwordsTopic } from "../router.ts";
-import type { AnswerInput, LLM, RecheckResult, RouteInput, RoutePlan } from "./types.ts";
+import type { SearchProvider } from "../search/types.ts";
+import type { AnswerEvent, AnswerInput, LLM, RecheckResult, RouteInput, RoutePlan } from "./types.ts";
 
 const PRODUCT_RE = /\b(?:[A-Z][a-zA-Z]+(?:\s(?:CRM|Workers|Cloud|Hub))?)\b/g;
 const NOT_PRODUCTS = new Set(["I", "We", "Our", "My", "Me", "It", "Its", "They", "And", "Or", "For", "In", "Of", "What", "Which", "How", "Compare", "Is", "Are", "Has", "Have", "On", "Last", "The", "Tell", "Should", "Give", "Can", "Do", "Does", "Postgres", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "November", "October", "December"]);
@@ -22,10 +23,32 @@ export class FakeLLM implements LLM {
     return { intent: "search", memoryQuery: topic, searchQueries: queries, sinceDays: 0, highStakes: /pric|cost|\$/i.test(input.text) };
   }
 
-  async *streamAnswer(input: AnswerInput): AsyncIterable<string> {
+  /** `search` lets the fake model run its own searches, like the real one's bounded web_search loop. */
+  constructor(private readonly search?: SearchProvider) {}
+
+  async *streamAnswer(input: AnswerInput): AsyncIterable<AnswerEvent> {
+    // Bounded self-search: only when the prefetched sources state no facts at all.
+    const hasFacts = input.sources.some((s) => grammarClaims(s.snippet).length > 0);
+    if (input.intent === "search" && !hasFacts && input.maxSelfSearches > 0 && this.search) {
+      const query = stopwordsTopic(input.question);
+      yield { type: "searching", query };
+      const found = (await this.search.search(query, { maxResults: 3, signal: input.signal })).filter((r) => grammarClaims(r.snippet).length);
+      for (const r of found) yield { type: "source", result: r };
+      if (found.length) {
+        yield { type: "text", text: `I searched again (as of ${input.nowLabel}):\n\n` };
+        for (const r of found) {
+          for (const f of r.snippet.match(/[A-Z][\w.]*(?: [A-Z][\w.]*)*: the [^.]+\./g) ?? []) {
+            yield { type: "text", text: `- ${f.replace(/\.$/, "")}` };
+            yield { type: "cite", url: r.url, title: r.title, citedText: f };
+            yield { type: "text", text: "\n" };
+          }
+        }
+        return;
+      }
+    }
     for (const word of this.compose(input).split(/(?<=\s)/)) {
       if (input.signal?.aborted) return;
-      yield word;
+      yield { type: "text", text: word };
     }
   }
 

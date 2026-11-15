@@ -1,0 +1,153 @@
+// The agent-loop parts: speculative search during routing, the answer model's own bounded searches,
+// batched Anthropic search, and the "current evidence only" price guard.
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { Agent, type AgentEvent } from "../src/agent.ts";
+import { Store } from "../src/db.ts";
+import { FakeLLM } from "../src/llm/fake.ts";
+import type { AnswerEvent, AnswerInput, LLM } from "../src/llm/types.ts";
+import { AnthropicWebSearch } from "../src/search/anthropic.ts";
+import { FakeSearch } from "../src/search/fake.ts";
+import { runQueries } from "../src/search/rank.ts";
+import type { SearchProvider } from "../src/search/types.ts";
+import { FakeClock } from "../src/time.ts";
+
+async function run(agent: Agent, sid: string, text: string) {
+  const events: AgentEvent[] = [];
+  for await (const e of agent.chat(sid, text)) events.push(e);
+  await agent.idle();
+  return { events, text: events.flatMap((e) => (e.type === "delta" ? [e.text] : [])).join("") };
+}
+
+function make(llm: LLM, search: SearchProvider, clock = new FakeClock("2026-11-10T10:00:00+05:30")) {
+  const store = new Store(":memory:");
+  return { store, clock, agent: new Agent({ store, llm, search, clock, timezone: "Asia/Kolkata" }) };
+}
+
+test("a slow router never blocks search: the speculative search answers within the short router budget", async () => {
+  const clock = new FakeClock("2026-11-10T10:00:00+05:30");
+  const search = new FakeSearch(clock);
+  const slow = new FakeLLM(search);
+  slow.route = () => new Promise(() => {}); // the router model hangs
+  const { agent } = make(slow, search, clock);
+  const t0 = performance.now();
+  const { events, text } = await run(agent, agent.newSession().id, "How much is the Cloudflare Workers paid plan?");
+  assert.ok(performance.now() - t0 < 2500, "answered within the speculative router budget");
+  const route = events.find((e) => e.type === "route");
+  assert.equal(route?.type === "route" && route.via, "fallback");
+  assert.equal(search.log.length, 1, "the speculative search was reused, not repeated");
+  assert.match(text, /\$5/);
+});
+
+test("the speculative search is cancelled when the router says no search is needed", async () => {
+  let aborted = false;
+  const search: SearchProvider = {
+    name: "watching",
+    search: (_q, o) =>
+      new Promise((resolve) => {
+        o?.signal?.addEventListener("abort", () => ((aborted = true), resolve([])));
+        setTimeout(() => resolve([]), 200);
+      }),
+  };
+  const llm = new FakeLLM();
+  llm.route = async () => ({ intent: "chat", memoryQuery: "", searchQueries: [], sinceDays: 0, highStakes: false });
+  const { store, agent } = make(llm, search);
+  const sid = agent.newSession().id;
+  await run(agent, sid, "Write me a haiku about databases");
+  assert.ok(aborted);
+  assert.equal(store.searchesFor(store.sessionMessages(sid)[0]!.id).length, 0);
+});
+
+test("bounded agent loop: when prefetched sources fall short, the answer model searches itself and cites it", async () => {
+  const clock = new FakeClock("2026-11-10T10:00:00+05:30");
+  const world = new FakeSearch(clock);
+  const empty: SearchProvider = { name: "empty", search: async () => [] }; // the planner's prefetch finds nothing
+  const { store, agent } = make(new FakeLLM(world), empty, clock);
+  const sid = agent.newSession().id;
+  const { events, text } = await run(agent, sid, "What does Neon Postgres cost?");
+  assert.ok(events.some((e) => e.type === "status" && e.text.startsWith("Searching the web:")));
+  const sources = events.filter((e) => e.type === "sources").at(-1);
+  assert.ok(sources?.type === "sources" && sources.sources.some((s) => s.domain === "neon.com"));
+  assert.match(text, /Neon: the Launch plan costs \$19 per month \[\d\]/);
+  assert.ok(!events.some((e) => e.type === "warning"), "self-found prices count as evidence");
+  assert.ok(store.searchesFor(store.sessionMessages(sid)[0]!.id).some((s) => s.purpose === "self-search"));
+});
+
+test("the loop is off for small talk and recall", async () => {
+  const seen: number[] = [];
+  const llm = new FakeLLM();
+  const base = llm.streamAnswer.bind(llm);
+  llm.streamAnswer = (input: AnswerInput) => (seen.push(input.maxSelfSearches), base(input));
+  const { agent } = make(llm, { name: "none", search: async () => [] });
+  const sid = agent.newSession().id;
+  await run(agent, sid, "hi");
+  await run(agent, sid, "What did I ask you yesterday?");
+  assert.deepEqual(seen, [0, 0]);
+});
+
+test("a stale price copied from an old answer is flagged", async () => {
+  const clock = new FakeClock("2026-11-10T10:00:00+05:30");
+  const search = new FakeSearch(clock);
+  const llm = new FakeLLM(search);
+  const base = llm.streamAnswer.bind(llm);
+  // A model that repeats what it said last time instead of reading today's sources.
+  llm.streamAnswer = async function* (input: AnswerInput): AsyncIterable<AnswerEvent> {
+    yield* base(input);
+    if (input.history.some((m) => m.content.includes("$19"))) yield { type: "text", text: "\n\nAs I said before, Neon's Launch plan is $19 per month." };
+  };
+  const { agent } = make(llm, search, clock);
+  const sid = agent.newSession().id;
+  await run(agent, sid, "What does Postgres hosting cost on Supabase, Neon and Railway?");
+  clock.set("2026-11-18T09:00:00+05:30"); // Neon is now $15
+  const { events } = await run(agent, sid, "What does Postgres hosting cost on Supabase, Neon and Railway?");
+  const warnings = events.flatMap((e) => (e.type === "warning" ? [e.text] : []));
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0]!, /\$19/);
+});
+
+test("re-check of facts the web no longer confirms never claims 'nothing changed'", async () => {
+  const clock = new FakeClock("2026-11-10T10:00:00+05:30");
+  const world = new FakeSearch(clock);
+  let down = false;
+  const flaky: SearchProvider = { name: "flaky", search: (q, o) => (down ? Promise.resolve([]) : world.search(q, o)) };
+  const { agent } = make(new FakeLLM(), flaky, clock);
+  await run(agent, agent.newSession().id, "What does Postgres hosting cost on Supabase, Neon and Railway?");
+  clock.set("2026-11-18T09:00:00+05:30");
+  down = true;
+  const { text } = await run(agent, agent.newSession().id, "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?");
+  assert.doesNotMatch(text, /Nothing I checked has changed/);
+  assert.match(text, /I couldn't verify any of the 5 facts from Tue 10 Nov/);
+});
+
+test("Anthropic web search: all planned queries go out in one call and results map back per query", async () => {
+  const calls: Array<Record<string, unknown>> = [];
+  const client = {
+    messages: {
+      create: async (body: Record<string, unknown>) => {
+        calls.push(body);
+        return {
+          stop_reason: "end_turn",
+          usage: { input_tokens: 100, output_tokens: 50, server_tool_use: { web_search_requests: 2 } },
+          content: [
+            { type: "server_tool_use", id: "t1", name: "web_search", input: { query: "Neon pricing" } },
+            { type: "web_search_tool_result", tool_use_id: "t1", content: [{ type: "web_search_result", url: "https://neon.com/pricing", title: "Neon Pricing", page_age: "November 14, 2026", encrypted_content: "x" }] },
+            { type: "server_tool_use", id: "t2", name: "web_search", input: { query: "Supabase pricing" } },
+            { type: "web_search_tool_result", tool_use_id: "t2", content: [{ type: "web_search_result", url: "https://supabase.com/pricing", title: "Supabase Pricing", page_age: null, encrypted_content: "y" }] },
+            { type: "text", text: "- Launch is $15", citations: [{ type: "web_search_result_location", url: "https://neon.com/pricing", title: "Neon Pricing", cited_text: "Launch plan $15/month", encrypted_index: "z" }] },
+          ],
+        };
+      },
+    },
+  };
+  const provider = new AnthropicWebSearch(client as never, "claude-haiku-5-5");
+  const runs = await runQueries(provider, [
+    { query: "Supabase pricing", purpose: "answer" },
+    { query: "Neon pricing", purpose: "answer" },
+  ]);
+  assert.equal(calls.length, 1, "one model call for both queries");
+  assert.equal((calls[0]!.tools as Array<{ max_uses: number }>)[0]!.max_uses, 2);
+  assert.equal(runs[0]!.results[0]!.url, "https://supabase.com/pricing");
+  assert.equal(runs[1]!.results[0]!.url, "https://neon.com/pricing");
+  assert.equal(runs[1]!.results[0]!.snippet, "Launch plan $15/month");
+  assert.equal(runs[1]!.results[0]!.publishedDate, "2026-11-14");
+});

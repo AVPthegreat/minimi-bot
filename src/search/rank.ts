@@ -24,7 +24,17 @@ export async function runQueries(
   queries: Array<{ query: string; purpose: string; opts?: SearchOptions }>,
   signal?: AbortSignal,
 ): Promise<QueryRun[]> {
-  // All in parallel: latency is the slowest search, not the sum.
+  // Providers that can batch (Anthropic web_search) get all queries in one round trip.
+  if (provider.searchBatch && queries.length > 1) {
+    const t0 = Date.now();
+    try {
+      const lists = await provider.searchBatch(queries.map(({ query, opts }) => ({ query, opts })), signal);
+      return queries.map(({ query, purpose }, i) => ({ query, purpose, results: lists[i] ?? [], ms: Date.now() - t0 }));
+    } catch (e) {
+      return queries.map(({ query, purpose }) => ({ query, purpose, results: [], error: (e as Error).message, ms: Date.now() - t0 }));
+    }
+  }
+  // Otherwise all in parallel: latency is the slowest search, not the sum.
   return Promise.all(
     queries.map(async ({ query, purpose, opts }) => {
       const t0 = Date.now();

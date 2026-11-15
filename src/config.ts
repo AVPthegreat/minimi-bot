@@ -49,6 +49,8 @@ export interface Config {
   tavilyKey: string;
   /** Hard cap on Anthropic spend per process, in USD (empty = no cap). */
   maxSpendUsd: number | null;
+  /** Web searches the answer model may run on its own per turn (the bounded agent loop). */
+  answerMaxSearches: number;
   watchEnabled: boolean;
   watchAfterDays: number;
   watchMaxSearches: number;
@@ -84,6 +86,7 @@ export function loadConfig(): Config {
     searchModel: env("SEARCH_MODEL", "claude-haiku-5-5"),
     tavilyKey,
     maxSpendUsd: cap ? Number(cap) : null,
+    answerMaxSearches: Math.max(0, Math.min(5, Number(env("ANSWER_MAX_SEARCHES", "3")))),
     watchEnabled: env("WATCH_ENABLED", "1") !== "0",
     watchAfterDays: Number(env("WATCH_AFTER_DAYS", "3")),
     watchMaxSearches: Number(env("WATCH_MAX_SEARCHES", "3")),
