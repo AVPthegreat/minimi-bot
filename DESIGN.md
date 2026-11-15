@@ -1,78 +1,59 @@
 # Design
 
-**Goal:** a web-search chat agent that answers fast, gets facts right, and remembers what you asked and when, so
-"what did I ask on 3 November, is it still correct?" works. Memory and time are first-class data, not chat history.
-
-## How it works
+A web-search chat agent that remembers **what you asked and when**. Time and memory are data, not chat history:
+"what did I ask on 3 November, is it still correct?" is a lookup plus a re-check of exactly the facts given then.
 
 ```
-message ─► save with timestamp ─► time resolver (code) ─► router: rules, else small model (4 s timeout, rules fallback)
-                                                             │
-     chat ── no tools ───────────────────────────────────────┤
-     recall ── SQLite: time window + FTS5 topic match ───────┤
-     search ── 1-5 queries in parallel ─► rank (official, fresh) ┤
-     verify ── recall ─► stored claims ─► targeted searches + "news since" in parallel
-               ─► small model reads current values ─► diff in code ─► table ─────┤
-                                                             ▼
-             stream answer (large model, cites [n] with dates) ─► price guard ─► save
-                                                             └─► extract claims (background) ─► watchlist
+message ─► save with timestamp ─► time phrases resolved in code ─┬─► router: rules, else small model
+                                     speculative search starts ──┘   (cancelled if no search needed)
+  chat    ─ no evidence
+  recall  ─ SQLite: time window + FTS5 keywords
+  search  ─ planned queries, parallel/batched ─► rank (official, fresh)
+  verify  ─ recall ─► stored claims ─► targeted + "news since" searches ─► small model reads values ─► diff in code
+        ─► answer model streams, cites [n]; may run ≤3 web searches itself if evidence falls short
+        ─► price guard vs current evidence ─► save ─► extract claims (background) ─► watchlist
 ```
 
-**Memory** is one SQLite file (`node:sqlite`, FTS5): `sessions`, `messages` (UTC ms timestamps, shown in the user's
-zone), `searches` (query, provider, results, time), and `claims`: checkable facts pulled from answers
-(subject, attribute, value, unit, source URL and date, checked_at, `supersedes_id` for re-checks). Claims are what
-make "has pricing changed since?" a precise operation instead of a vibe: we re-check *those facts*, not the topic.
+**Memory.** One SQLite file (built into Node 22): sessions, messages (UTC, shown in your timezone), every search
+(query, provider, results, time), and **claims**: checkable facts from answers (subject, attribute, value, unit,
+source, date, re-check chain).
 
-**Time** is resolved by deterministic code against an injectable clock, in the user's timezone: "yesterday",
-"on Monday", "on 3 November", "two weeks ago", "last week". Ambiguity is data, not a guess: "last Tuesday" said on a
-Wednesday yields two candidate days; memory picks the one with a matching conversation and the answer says so
-("could mean 17 or 10 Nov; you asked on 10 Nov, so I used that").
+**Time.** "Yesterday", "on Monday", "3 November", "two weeks ago" resolve in code against an injectable clock.
+Ambiguity is resolved by data: "last Tuesday" on a Wednesday gives two candidate days; memory uses the one with a
+matching conversation, and the answer says which.
 
-**Getting it right.** Sources are ranked toward official pages and recent dates; the answer model must cite `[n]` and
-date anything that changes, and may only state prices found in sources or memory. That rule is *checked*: every
-price in the answer is matched against the evidence and unmatched ones are flagged in the UI. The then/now table is
-rendered by code from stored values, so a model can't misquote a number in it. Unverifiable facts say "couldn't
-verify", never carry the old value forward. Search failure is reported, not papered over.
+**Pipeline + bounded agent loop.** The predictable work runs as a fixed pipeline, in parallel: routing, planned
+searches, memory lookups, re-checks. The answer model is also an agent when it needs to be: it gets the web_search
+tool with at most 3 uses, for when the prefetched sources do not answer the question. A free-running loop would be
+slower and hard to test on every turn; a pure pipeline gets stuck when the planner's queries miss.
 
-**The right moment.** Every checkable fact in a web answer (up to 12 per answer) is tracked. When you open a new chat, the agent re-checks up to 3 subjects
-whose facts are older than 3 days (cached: a fact checked recently is skipped). If one changed, the chat opens with
-one line ("Neon Launch plan: $19 then, $15 now, source dated 14 Nov"); otherwise it stays silent. The same change is
-never announced twice; others wait for "anything new?". An assistant that pings "no news" gets ignored. Optional
-(`WATCH_ENABLED`), bounded (`WATCH_MAX_SEARCHES`), off the request path (12 s cap), and dropped if you start typing first.
+**Getting it right.** Official and recent pages rank first. Answers cite `[n]` with dates. Every price is checked
+against *current* evidence (fresh sources, the model's own cited passages, the diff table), matching amount, currency
+and the product it belongs to; old answers don't count, so stale prices get flagged. The then/now table is rendered
+by code, and its summary counts "couldn't verify" and never claims "nothing changed" unless every fact was verified.
 
-## Key decisions
+**The right moment** (minimi's idea). Stated facts are a watchlist. A new chat quietly re-checks up to 3 subjects
+older than 3 days. If one changed, the chat opens with one line; if not, it says nothing. It never repeats itself,
+it is dropped if you start typing first, and it can be turned off (`WATCH_ENABLED`).
 
 | Decision | Why | Rejected |
 |---|---|---|
-| Route first (rules, then a small model) | Small talk and memory questions need no search: instant, free. Rules catch the obvious cases with zero model calls | Always-search: slower, costlier, and pollutes recall answers with web noise |
-| Claims as rows, diff in code | "Still correct?" becomes per-fact re-checks with an exact changed/unchanged/unverified table | Re-asking the question and letting the model compare prose: misses changes, invents some |
-| SQLite FTS5 + time windows | Questions about the past are keyed by *when* and keywords; BM25 inside a window is exact and explainable | Vector DB: an extra service and embeddings for a problem that is mostly time filtering |
-| Plain Anthropic SDK, ~2.7k lines of TypeScript | Every step is visible and testable; parallelism and timeouts are explicit | LangChain/agent frameworks: hidden prompts and control flow, harder to defend |
-| Search behind an interface | Tavily: one fast call with snippets and dates. Anthropic `web_search`: needs only the Anthropic key | Scraping pages ourselves: slow, brittle |
-| Fakes for model, search and clock | The whole multi-day eval runs offline in `npm test`, deterministic | Testing only against the live web: flaky and unrepeatable |
+| Rules, then a small router, with a speculative search started in parallel | Small talk and memory questions need no web; a web question doesn't wait for routing (1.5 s cap) | Always search: slower and noisy. Router first: adds up to 4 s |
+| Claims as rows, diff in code | Per-fact changed/unchanged/unverified | A model comparing prose: misses changes, invents some |
+| SQLite FTS5 + time windows | Exact and explainable, no extra service | Vector DB: embeddings for a problem that is mostly *when* |
+| Plain Anthropic SDK | Every prompt and step visible and testable | LangChain: hidden control flow |
+| Search behind an interface | Tavily: fast, dated snippets. **Only an Anthropic key:** Anthropic's `web_search` tool, all planned queries batched into one Haiku call | Scraping pages ourselves |
+| Fakes for model, search and clock | The multi-day eval runs offline in `npm test` | Only live tests: flaky |
 
-Models: `claude-opus-5-5` writes answers (streamed; effort `low` for chat/recall, `medium` for web; server-side refusal
-fallback on); `claude-haiku-5-5` routes, extracts claims and reads re-checked values with JSON-schema outputs.
+Models: `claude-opus-5-5` streams answers (effort low for chat/recall, medium for web); `claude-haiku-5-5` routes,
+extracts claims and reads re-checked values (JSON schema output).
 
-## Latency budget (targets for a search turn; measured per turn in the UI and by `eval:live`)
+**Latency: targets, not yet measured** (`npm run eval:live` writes p50/p95 per question type to `eval/results/`).
+Chat/recall: first token ≈1 s. Search turn: ≈1 s of search with Tavily (≈3-6 s with Anthropic search), then ≈1 s to
+the first token. Verify: the code-rendered table appears before the model starts.
 
-Rules route 0 ms, or model route ~0.5 s · searches in parallel ~1 s (Tavily) / ~3-6 s (Anthropic web_search: one
-model call per query) · first answer token ~1 s later · claim extraction after the answer, off the critical path.
-Chat and recall: first token in ~1 s (no search). Verify: the code-rendered table streams before the model starts.
-Known cost: an unsure message waits for the router model (capped at 4 s) before searching.
+**Eval.** `eval/scenarios.ts` replays multi-day conversations (the three example questions, nudges, fast paths) on a
+fake clock against a fixture web whose prices change on known dates: 48 checks, run offline by `npm test`.
 
-## Evaluation
-
-`eval/scenarios.ts` replays multi-day conversations on a fake clock against a fixture web whose prices change on
-known dates: Postgres hosting asked Tue 10 Nov, "last Tuesday... changed?" on Wed 18 Nov; a 5-CRM shortlist on Monday
-re-checked on Thursday (price change + a launch); "what did I ask on 3 November, still correct?"; nudge timing (silent
-when too soon, one nudge, never twice); fast paths. 48 checks, all in `npm test`. `eval:live` runs the same scripts on
-real models with a spend cap and skips only the checks that depend on fixture prices.
-
-## With another week
-
-1. Fetch and read the official page for each re-checked claim (not just snippets) and require two agreeing sources
-   for high-stakes numbers. 2. A real background scheduler (macOS launch agent) so nudges arrive at a good moment
-   instead of on chat open, plus "stop tracking this". 3. Embeddings as a second recall signal for paraphrases
-   ("database host" vs "Postgres hosting"). 4. A live eval set graded by a judge model, run nightly, with latency
-   percentiles. 5. Start a speculative search in parallel with the router call; conversation summaries for long sessions.
+**With another week:** read full official pages and require two sources for high-stakes numbers; a macOS background
+scheduler for nudges; embeddings for paraphrased recall; a nightly live eval graded by a judge model.

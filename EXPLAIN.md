@@ -28,6 +28,15 @@ becomes a precise lookup plus a re-check of exactly those facts, with a then/now
 
 ## Every important decision, in plain words
 
+- **Is it a real agent or a pipeline?** Both, on purpose. The predictable steps (route, search, recall, re-check)
+  run as a fast parallel pipeline. The answer model also gets the web_search tool with a budget of 3 searches, so
+  when the planned searches missed, it can look again itself. A free-running loop on every turn would be slow and
+  hard to test; a pure pipeline gets stuck when the plan is wrong.
+- **Doesn't routing slow things down?** When the rules can't decide, the agent starts searching for the raw
+  question immediately, while the router thinks. If the router says "no search", that search is cancelled; if the
+  router is slow (over 1.5 s), the agent answers from the speculative search.
+- **What if there's only an Anthropic key?** Search uses Anthropic's web_search tool, and all planned queries go
+  into ONE small-model call (not one call per query).
 - **Why route instead of always searching?** Most messages that mention the past don't need the web, and "hi"
   shouldn't cost a search. Routing makes those instant and free. The obvious cases are caught by rules with no model
   call at all.
