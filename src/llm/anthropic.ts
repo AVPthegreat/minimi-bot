@@ -4,15 +4,17 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { Effort } from "../config.ts";
+import type { UsageMeter } from "../usage.ts";
 import type { NewClaim } from "../db.ts";
 import {
   ANSWER_SYSTEM, EXTRACT_SCHEMA, EXTRACT_SYSTEM, RECHECK_SCHEMA, RECHECK_SYSTEM, ROUTER_SCHEMA, ROUTER_SYSTEM,
-  renderAnswerTurn, renderRecheck, renderRouteInput, renderSources,
+  renderAnswerTurn, renderRecheck, renderRouteInput,
 } from "./prompts.ts";
 import type { AnswerInput, LLM, RecheckResult, RouteInput, RoutePlan } from "./types.ts";
 
 export interface AnthropicOptions {
-  apiKey: string;
+  client: Anthropic;
+  meter?: UsageMeter;
   answerModel: string;
   fastModel: string;
   answerEffort: Effort;
@@ -25,12 +27,13 @@ export class AnthropicLLM implements LLM {
   private readonly client: Anthropic;
 
   constructor(private readonly opts: AnthropicOptions) {
-    this.client = new Anthropic({ apiKey: opts.apiKey, maxRetries: 2 });
+    this.client = opts.client;
     this.name = `anthropic (${opts.answerModel} + ${opts.fastModel})`;
   }
 
   /** One structured-output call to the small model; returns the parsed JSON. */
   private async json<T>(system: string, user: string, schema: object, timeoutMs: number, maxTokens = 2048): Promise<T> {
+    this.opts.meter?.check();
     const res = await this.client.messages.create(
       {
         model: this.opts.fastModel,
@@ -41,6 +44,7 @@ export class AnthropicLLM implements LLM {
       },
       { timeout: timeoutMs, maxRetries: 1 },
     );
+    this.opts.meter?.add(this.opts.fastModel, res.usage);
     if (res.stop_reason === "refusal" || res.stop_reason === "max_tokens") throw new Error(`small model stopped: ${res.stop_reason}`);
     const text = res.content.find((b) => b.type === "text");
     if (!text || text.type !== "text") throw new Error("small model returned no text");
@@ -62,6 +66,7 @@ export class AnthropicLLM implements LLM {
 
   async *streamAnswer(input: AnswerInput): AsyncIterable<string> {
     const history: Anthropic.Beta.BetaMessageParam[] = input.history.map((m) => ({ role: m.role, content: m.content }));
+    this.opts.meter?.check();
     const effort: Effort = input.intent === "chat" || input.intent === "recall" ? "low" : this.opts.answerEffort;
     const stream = this.client.beta.messages.stream(
       {
@@ -81,6 +86,7 @@ export class AnthropicLLM implements LLM {
       if (event.type === "content_block_delta" && event.delta.type === "text_delta") yield event.delta.text;
     }
     const final = await stream.finalMessage();
+    this.opts.meter?.add(final.model, final.usage);
     if (final.stop_reason === "refusal") yield "\n\nI can't help with that one.";
     if (final.stop_reason === "max_tokens") yield "\n\n(Answer cut short: it hit the length limit.)";
   }
@@ -114,6 +120,3 @@ export class AnthropicLLM implements LLM {
     });
   }
 }
-
-// Exported for tests that want to see exactly what the model is sent.
-export { renderAnswerTurn, renderSources };

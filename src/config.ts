@@ -27,8 +27,12 @@ export interface Config {
   fastModel: string;
   answerEffort: Effort;
   fastSpeed: boolean;
-  searchProvider: "tavily" | "fake";
+  searchProvider: "tavily" | "anthropic" | "fake";
+  /** Model that runs Anthropic's server-side web_search when that provider is used. */
+  searchModel: string;
   tavilyKey: string;
+  /** Hard cap on Anthropic spend per process, in USD (empty = no cap). */
+  maxSpendUsd: number | null;
   watchEnabled: boolean;
   watchAfterDays: number;
   watchMaxSearches: number;
@@ -38,9 +42,14 @@ export function loadConfig(): Config {
   const anthropicKey = env("ANTHROPIC_API_KEY");
   const tavilyKey = env("TAVILY_API_KEY");
   const forcedFake = env("FAKE_MODE") === "1";
-  const missing = [!anthropicKey && "ANTHROPIC_API_KEY", !tavilyKey && "TAVILY_API_KEY"].filter(Boolean);
-  const fakeMode = forcedFake || missing.length > 0;
-  const fakeReason = forcedFake ? "FAKE_MODE=1" : missing.length ? `missing ${missing.join(", ")}` : "";
+  // Only the Anthropic key is required: without a Tavily key, search runs on Anthropic's web_search tool.
+  const fakeMode = forcedFake || !anthropicKey;
+  const fakeReason = forcedFake ? "FAKE_MODE=1" : !anthropicKey ? "missing ANTHROPIC_API_KEY" : "";
+  const wanted = env("SEARCH_PROVIDER", "auto");
+  if (!["auto", "tavily", "anthropic"].includes(wanted)) throw new Error(`SEARCH_PROVIDER must be auto, tavily or anthropic (got "${wanted}")`);
+  if (wanted === "tavily" && !tavilyKey && !fakeMode) throw new Error("SEARCH_PROVIDER=tavily needs TAVILY_API_KEY");
+  const searchProvider = fakeMode ? "fake" : wanted === "auto" ? (tavilyKey ? "tavily" : "anthropic") : (wanted as "tavily" | "anthropic");
+  const cap = env("MAX_SPEND_USD");
   return {
     port: Number(env("PORT", "3000")),
     host: env("HOST", "127.0.0.1"),
@@ -55,8 +64,10 @@ export function loadConfig(): Config {
     fastModel: env("FAST_MODEL", "claude-haiku-5-5"),
     answerEffort: (env("ANSWER_EFFORT", "medium") as Effort),
     fastSpeed: env("FAST_OUTPUT") === "1",
-    searchProvider: fakeMode ? "fake" : "tavily",
+    searchProvider,
+    searchModel: env("SEARCH_MODEL", "claude-haiku-5-5"),
     tavilyKey,
+    maxSpendUsd: cap ? Number(cap) : null,
     watchEnabled: env("WATCH_ENABLED", "1") !== "0",
     watchAfterDays: Number(env("WATCH_AFTER_DAYS", "3")),
     watchMaxSearches: Number(env("WATCH_MAX_SEARCHES", "3")),
