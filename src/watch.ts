@@ -60,24 +60,45 @@ export function rowsToShow<T extends { status: string }>(rows: T[], max = MAX_RO
 }
 
 /**
- * Check the watchlist and return at most one nudge, or null when nothing changed (or nothing was
- * due). Writes the fresh values back, so the same change is never announced twice and a fact
- * that was just checked is not searched again for `afterDays`.
+ * What one watchlist check found. Nothing is written until `commit`: a change counts as known only
+ * once the user has actually been told about it.
  */
-export async function checkWatchlist(deps: WatchDeps, sessionId: string, nowMs: number, cfg: WatchConfig): Promise<Nudge | null> {
-  if (!cfg.enabled) return null;
+export interface WatchCheck {
+  /** One short line about the most useful change, or null when nothing changed. */
+  nudge: Nudge | null;
+  /**
+   * Record the outcome. Unchanged facts are always saved and marked checked. With `shown` the nudge was
+   * stored as the session's first message: the announced change is saved as the fact's new value and every
+   * checked fact is marked checked. Without it (the user started typing first) no change is saved and the
+   * changed facts stay due, so the next new chat announces the change and "anything new?" still reports it.
+   */
+  commit(shown: boolean): void;
+}
+
+/**
+ * Check the watchlist. Returns null when the watch is off, nothing is due, or `signal` was aborted (the
+ * caller gave up: nothing is written then). The signal reaches every search and the re-check model call.
+ */
+export async function checkWatchlist(deps: WatchDeps, sessionId: string, nowMs: number, cfg: WatchConfig, signal?: AbortSignal): Promise<WatchCheck | null> {
+  if (!cfg.enabled || signal?.aborted) return null;
   const claims = dueClaims(deps.store, nowMs, cfg);
   if (claims.length === 0) return null;
-  const outcome = await recheckClaims(deps, claims, { nowMs, maxQueries: cfg.maxSearches });
+  const outcome = await recheckClaims(deps, claims, { nowMs, maxQueries: cfg.maxSearches, signal });
+  if (signal?.aborted) return null;
   const changed = outcome.rows.map((r, i) => ({ r, c: claims[i]!, i })).filter((x) => x.r.status === "changed");
-  // Record what we confirmed: unchanged facts, and the one change we announce. Other changes stay
-  // pending, so "anything new?" still reports them.
-  const keep = new Set(outcome.rows.map((r, i) => (r.status === "unchanged" ? i : -1)).filter((i) => i >= 0));
-  if (changed[0]) keep.add(changed[0].i);
-  const pick = <T>(xs: T[]) => xs.filter((_, i) => keep.has(i));
-  saveRecheck(deps.store, { ...outcome, claims: pick(outcome.claims), found: pick(outcome.found), rows: pick(outcome.rows) }, null, sessionId, nowMs);
-  deps.store.markRechecked(claims.map((c) => c.id), nowMs);
-  if (changed.length === 0) return null;
+  const commit = (shown: boolean) => {
+    // Unchanged facts are confirmed whatever happens; the announced change only once it was shown. Other
+    // changes stay pending either way, so "anything new?" still reports them.
+    const keep = new Set(outcome.rows.map((r, i) => (r.status === "unchanged" ? i : -1)).filter((i) => i >= 0));
+    if (shown && changed[0]) keep.add(changed[0].i);
+    const pick = <T>(xs: T[]) => xs.filter((_, i) => keep.has(i));
+    saveRecheck(deps.store, { ...outcome, claims: pick(outcome.claims), found: pick(outcome.found), rows: pick(outcome.rows) }, null, sessionId, nowMs);
+    // Shown: the nudge names the extra changes ("ask me anything new?"), so nothing is re-searched for
+    // `afterDays`. Not shown: changed facts stay due, so the next new chat re-checks and announces them.
+    const unseen = new Set(shown ? [] : changed.map((x) => x.c.id));
+    deps.store.markRechecked(claims.filter((c) => !unseen.has(c.id)).map((c) => c.id), nowMs);
+  };
+  if (changed.length === 0) return { nudge: null, commit };
 
   // The single most useful change: the one from the user's most recent question.
   const { r, c } = changed[0]!;
@@ -90,5 +111,5 @@ export async function checkWatchlist(deps: WatchDeps, sessionId: string, nowMs: 
   const text =
     `**Heads-up:** something ${about} has changed. ${r.subject} ${r.attribute}: ${withUnit(c.value, c.unit)} then, ` +
     `**${r.newValue}** now${src ? " [1]" : ""}${src?.publishedDate ? ` (source dated ${src.publishedDate})` : ""}.${more}`;
-  return { text, sources: src ? [{ ...src, n: 1 }] : [], changes: changed.length };
+  return { nudge: { text, sources: src ? [{ ...src, n: 1 }] : [], changes: changed.length }, commit };
 }

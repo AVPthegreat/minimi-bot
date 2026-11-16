@@ -85,5 +85,5 @@ export interface LLM {
   streamAnswer(input: AnswerInput): AsyncIterable<AnswerEvent>;
   extractClaims(input: { question: string; answer: string; sources: Source[] }): Promise<NewClaim[]>;
   /** For each claim, its current value according to `sources` (null = not stated there). */
-  recheck(input: { claims: ClaimRow[]; sources: Source[] }): Promise<Array<RecheckResult | null>>;
+  recheck(input: { claims: ClaimRow[]; sources: Source[]; signal?: AbortSignal }): Promise<Array<RecheckResult | null>>;
 }

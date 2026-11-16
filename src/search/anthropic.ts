@@ -10,6 +10,21 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { UsageMeter } from "../usage.ts";
 import type { SearchOptions, SearchProvider, SearchResult } from "./types.ts";
 
+/**
+ * The ONE place that picks Anthropic's web_search tool version, for both the answer model's own searches
+ * (`AnthropicLLM.streamAnswer`) and the search calls here. The newer version (dynamic filtering) is used on
+ * every model that supports it: Fable, Mythos, and Opus/Sonnet 4.6 and later. Other models (the default
+ * SEARCH_MODEL, Haiku, among them) are not documented for it, so they keep the basic version rather than
+ * risk every search failing on a 400.
+ */
+export const WEB_SEARCH_TOOL = "web_search_20260209" as const;
+export const WEB_SEARCH_TOOL_BASIC = "web_search_20250305" as const;
+const DYNAMIC_FILTERING = /^claude-(?:fable|mythos)-|^claude-(?:opus|sonnet)-(?:4-[6-9]|[5-9])(?:-|$)/;
+
+export function webSearchTool(model: string): typeof WEB_SEARCH_TOOL | typeof WEB_SEARCH_TOOL_BASIC {
+  return DYNAMIC_FILTERING.test(model) ? WEB_SEARCH_TOOL : WEB_SEARCH_TOOL_BASIC;
+}
+
 const SYSTEM = `You are a search backend, not an assistant. Run exactly one web_search with the query text as given. Then write one bullet per relevant fact, quoting the result verbatim, with the product, plan name, price and unit together in the same bullet, and end the bullet with the result's URL in angle brackets:
 - "Neon Launch plan: $19/month" <https://neon.com/pricing>
 Cover prices, plan names, version numbers, dates and announcements. Every bullet must be a quotation from a result. No commentary, no advice.`;
@@ -32,7 +47,7 @@ export class AnthropicWebSearch implements SearchProvider {
         model: this.model,
         max_tokens: 2048,
         system: SYSTEM,
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }],
+        tools: [{ type: webSearchTool(this.model), name: "web_search", max_uses: 1 }],
         messages: [{ role: "user", content: `Query: ${query}${since}` }],
         output_config: { effort: "low" },
       },

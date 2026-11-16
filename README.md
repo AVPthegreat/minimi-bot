@@ -47,7 +47,7 @@ injection in search results, a watchlist where nothing changed).
 - On the 5 scenarios of run 1, run 4 passed **36 / 36**.
 - The one run-4 miss was the check, not the agent: naming the 23:40 question as last night's context is correct, but
   the check failed on any mention of it. The check is now precise (commit `9aef87d`).
-- Offline: **131 / 131** eval checks (12 multi-day scenarios on a fake clock) and **100 / 100** tests in `npm test`.
+- Offline: **131 / 131** eval checks (12 multi-day scenarios on a fake clock) and **127 / 127** tests in `npm test`.
 - Total live spend for all four runs: **$4.72**.
 - Medians in run 4: a web-search answer starts after 12.8 s and finishes in 19.6 s; a memory answer finishes in 2.9 s
   (its date reading and quoted question appear at once).
@@ -93,7 +93,7 @@ schema, stream events, errors, configuration, test map) and [EXPLAIN.md](EXPLAIN
 
 | Command | What it does |
 |---|---|
-| `npm test` | 100 tests: unit tests and the offline scenarios (no network, no keys) |
+| `npm test` | 127 tests: unit tests and the offline scenarios (no network, no keys) |
 | `npm run eval` | The multi-day eval with a readable report: 131 checks offline (`EVAL_VERBOSE=1` prints answers) |
 | `npm run eval:live` | The same scenarios against the real models and web search, capped at `MAX_SPEND_USD` (default $5) |
 | `npm run report` | Rebuilds the report data from `eval/live-reports/` and the offline runs |

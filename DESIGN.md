@@ -38,7 +38,8 @@ so they never depend on the model's wording; the summary never claims "nothing c
 
 **The right moment** (minimi's idea). Stated facts are a watchlist. A new chat quietly re-checks up to 3 subjects
 (all their facts share one search each) older than 3 days; "anything new?" shows at most 6 rows, changes first. If one changed, the chat opens with one
-line; if not, silence. Never twice, dropped if you start typing first, can be turned off (`WATCH_ENABLED`).
+line; if not, silence. Never twice and never lost: a change is saved only with the nudge that shows it, so a nudge
+dropped (you typed first) or cancelled (12 s, typing in the demo) leaves it for the next chat. Off: `WATCH_ENABLED=0`.
 
 | Decision | Why | Rejected |
 |---|---|---|

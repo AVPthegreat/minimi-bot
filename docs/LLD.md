@@ -61,7 +61,7 @@ class Agent {
   nowLabel(): string                      // "Mon 16 Nov 2026, 14:05 (Asia/Kolkata)"
   newSession(): SessionRow
   chat(sessionId: string, text: string, signal?: AbortSignal): AsyncGenerator<AgentEvent>
-  nudge(sessionId: string): Promise<{ messageId: number; nudge: Nudge } | null>
+  nudge(sessionId: string, signal?: AbortSignal): Promise<{ messageId: number; nudge: Nudge } | null>
   idle(): Promise<void>                   // waits for background claim extraction
 }
 ```
@@ -181,7 +181,7 @@ Providers:
 | Provider | Call | Notes |
 |---|---|---|
 | `TavilySearch` | `POST https://api.tavily.com/search`, 8 s timeout joined with the caller's signal | `deep` maps to `search_depth: advanced`; `sinceDays` switches to the news index with `days`; snippets cut to 1,200 characters. |
-| `AnthropicWebSearch` | One `messages.create` on `SEARCH_MODEL` with `web_search_20250305`, `max_uses: 1`, effort low, 30 s timeout, 1 retry | `meter.check()` first. Results come from `web_search_tool_result` blocks (deduplicated by URL; an error object instead of a list counts as a failure). Snippets are the citations' verbatim `cited_text`, plus the model's quoted bullets for URLs the search returned (a bullet naming an unknown URL is ignored), plus the whole text block when it contains a money amount. Quoted results rank first (score 0.9 minus 0.05 per position); title-only ones get score 0.3. |
+| `AnthropicWebSearch` | One `messages.create` on `SEARCH_MODEL` with the web_search version `webSearchTool(SEARCH_MODEL)` picks (`web_search_20260209` on Fable, Mythos and Opus/Sonnet 4.6+, `web_search_20250305` on other models such as the default Haiku), `max_uses: 1`, effort low, 30 s timeout, 1 retry | `meter.check()` first. Results come from `web_search_tool_result` blocks (deduplicated by URL; an error object instead of a list counts as a failure). Snippets are the citations' verbatim `cited_text`, plus the model's quoted bullets for URLs the search returned (a bullet naming an unknown URL is ignored), plus the whole text block when it contains a money amount. Quoted results rank first (score 0.9 minus 0.05 per position); title-only ones get score 0.3. |
 | `FakeSearch` | `fixtures/world.json` filtered by the injected clock (`from` ≤ now < `to`) | Token overlap ≥ 0.6 of query words; `sinceDays` filters by `published`; logs every query for assertions. |
 
 `runQueries(provider, queries, signal, onRun?, onStart?)`: `Promise.all` over the queries; each call is wrapped so
@@ -373,21 +373,26 @@ value is `null`.
   due facts of a chosen subject are included because they share its one search; leaving one out made the next new
   chat search the same subject again (live run 2).
 - `rowsToShow(rows, max = 6)`: changed, then unverified, then unchanged; original order within each group.
-- `checkWatchlist(deps, sessionId, now, cfg)`:
-  1. Off, or nothing due: `null`.
-  2. `recheckClaims` with `maxQueries = maxSearches` and no news queries.
-  3. Save: unchanged facts and only the **first** changed fact become new versions; `markRechecked` on every
-     checked fact. Other changes stay unsaved, so "anything new?" still reports them; facts that could not be
-     verified are not retried for `afterDays`.
-  4. No change: `null` (silence). Else one line, for example:
+- `checkWatchlist(deps, sessionId, now, cfg, signal?)` writes nothing; it returns `{nudge, commit(shown)}` or `null`:
+  1. Off, nothing due, or `signal` aborted (before or after the searches): `null`.
+  2. `recheckClaims` with `maxQueries = maxSearches`, no news queries, and the signal, which reaches every search
+     and the re-check model call (no model call at all once aborted).
+  3. `nudge`: `null` when nothing changed (silence), else one line for the first change, for example:
      `**Heads-up:** something you asked about on Tue 10 Nov has changed. Neon Launch plan price: $19 per month then, **$25 per month** now [1] (source dated 2026-11-12). (1 more change: ask me "anything new?")`
-- `Agent.nudge(sessionId)`: only for an existing, empty session. After the check, if the user has written meanwhile,
-  return `null`; else store the line as the first assistant message (`meta.intent = "nudge"`) and keep the session
-  untitled (hidden from the sidebar until the user writes). node:sqlite is synchronous, so check-then-insert is
-  atomic.
+  4. `commit(shown)`: unchanged facts always become new versions and are marked checked. With `shown`, the
+     announced change also becomes the new version and every checked fact is marked checked (the line names the
+     other changes; "anything new?" reports them). Without `shown`, no change is saved and changed facts are not
+     marked checked, so they stay due.
+- `Agent.nudge(sessionId, signal?)`: only for an existing, empty session. After the check: aborted means `null`
+  with nothing written; otherwise `shown` = a change was found and the session is still empty, then `commit(shown)`
+  and, if shown, the line is stored as the first assistant message (`meta.intent = "nudge"`; the session stays
+  untitled, hidden from the sidebar until the user writes). node:sqlite is synchronous, so the emptiness check,
+  the commit and the insert run as one step.
 
-"Never twice" follows from step 3: the announced change is now the chain head, so the next check compares against
-the new value.
+A change is therefore saved exactly when the user is shown it. "Never twice": the announced change is now the chain
+head, so the next check compares against the new value. "Never lost": a nudge dropped because the user typed first,
+or cancelled, leaves the old value as the head and the fact due, so the next new chat announces the change and
+"anything new?" (which compares against the head) reports it.
 
 ### 2.12 `src/llm/*`: the model port
 
@@ -408,7 +413,7 @@ interface LLM {
 | `route` | `FAST_MODEL` | JSON schema output (`ROUTER_SCHEMA`: intent chat/recall/verify/search, queries, since_days 0-365, memory_query, high_stakes), effort low, 4 s, 1 retry, 1,024 tokens |
 | `extractClaims` | `FAST_MODEL` | `EXTRACT_SCHEMA`, 20 s, 4,096 tokens; at most 24 claims; `source_n` mapped to a source URL and date |
 | `recheck` | `FAST_MODEL` | `RECHECK_SCHEMA`, 15 s, 4,096 tokens |
-| `streamAnswer` | `ANSWER_MODEL` | `beta.messages.stream`, 16,000 max tokens, system prompt cached (`ephemeral`), effort low for chat/recall else `ANSWER_EFFORT`, `web_search_20260209` tool only when `maxSelfSearches > 0`, server-side fallback beta, optional `speed: fast` |
+| `streamAnswer` | `ANSWER_MODEL` | `beta.messages.stream`, 16,000 max tokens, system prompt cached (`ephemeral`), effort low for chat/recall else `ANSWER_EFFORT`, web_search tool (version from the same `webSearchTool(ANSWER_MODEL)`, so `web_search_20260209` on the default Opus) only when `maxSelfSearches > 0`, server-side fallback beta, optional `speed: fast` |
 
 Stream mapping: `text_delta` gives `text`; a `server_tool_use` block's JSON input gives `searching` at its end;
 `web_search_tool_result` gives `source` per result; `citations_delta` is buffered and emitted as `cite` at the end
@@ -442,18 +447,22 @@ Routes (shared by both modes):
 
 | Method, path | Purpose |
 |---|---|
-| `GET /api/health` | Mode, fake reason, model and search names, timezone, now, clock settable, watch on; `demo` limits in demo mode |
+| `GET /api/health` | Mode, fake reason, model and search names, timezone, now, clock settable, watch on; `demo` limits in demo mode (fake reason "hosted demo, offline test web" only when the demo runs in fake mode; never the server's `.env` details) |
 | `GET /api/logo?domain=` | Logo image or letter tile |
 | `POST /api/clock` `{now}` or `{reset: true}` | Move the demo clock (fake mode, `ALLOW_CLOCK_OVERRIDE=1`, or the visitor's own clock in the demo) |
 | `GET /api/sessions` | Titled sessions, newest first (max 100) |
 | `POST /api/sessions` | New session id |
-| `POST /api/sessions/:id/nudge` | The right-moment check, raced against 12 s |
+| `POST /api/sessions/:id/nudge` | The right-moment check under one `AbortController`: aborted after 12 s (`NUDGE_TIMEOUT_MS`), when the client goes away, or (demo) by the visitor's next message; an aborted nudge writes nothing and answers `{nudge: null}` |
 | `GET /api/sessions/:id/messages` | Messages with sources, warnings, intent, timings |
 | `POST /api/chat` `{sessionId?, text}` | SSE stream of `AgentEvent` |
-| `GET /api/demo/status` | Demo only: budget used, visitors, open visitors, streams |
+| `GET /api/demo/status` | Demo only: fake or not, model and search provider, budget used, visitors, open visitors, streams |
 | `GET /<path>` | Static files from `public/`; a path without an extension serves `<path>/index.html` |
 
 Session ids must match `[\w-]{1,64}`. Every POST passes the Origin and content-type checks before routing.
+Both modes send the same security headers (`securityHeaders` in `src/app.ts`): a CSP for our own origin (`default-src 'self'`,
+inline scripts only by the SHA-256 of the theme snippet in `index.html` and `report/index.html`, `style-src 'self' 'unsafe-inline'`,
+`img-src 'self' data:`, `font-src 'self'`, `frame-ancestors 'none'`), `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy:
+no-referrer`, COOP, `Permissions-Policy`, and HSTS in the demo behind HTTPS.
 
 Visitor lifecycle (demo):
 
@@ -533,6 +542,7 @@ CREATE TABLE messages (
 );
 CREATE INDEX messages_time    ON messages(role, created_at);
 CREATE INDEX messages_session ON messages(session_id, id);
+CREATE INDEX searches_message ON searches(message_id);
 CREATE VIRTUAL TABLE messages_fts USING fts5(
   content, content='messages', content_rowid='id', tokenize='porter unicode61'
 );
@@ -568,7 +578,7 @@ CREATE INDEX claims_subject    ON claims(subject COLLATE NOCASE);
 Main queries: `userMessagesBetween` uses `messages_time`; `sessionMessages` and `recentMessages` use
 `messages_session`; `searchUserMessages` joins `messages_fts`; `watchCandidates` uses `claims_supersedes` and
 `claims_subject` with two correlated sub-queries; `rootClaim` walks `supersedes_id` up to 50 steps.
-`searchesFor(message_id)` has no index on `searches.message_id` (fine at one user's scale; see HLD scaling).
+`searchesFor` uses `searches_message`.
 
 Demo registry (`src/demo/registry.ts`, `DATA_DIR/demo.db`), pragmas `WAL`, `synchronous = FULL`,
 `busy_timeout = 2000`:
@@ -654,7 +664,7 @@ plus a `Retry-After` header):
 | 404 | | Unknown route or file |
 | 413 | | Body over the cap (64 KB, demo 16 KB) |
 | 415 | | POST without `application/json` |
-| 429 | `rate_limited`, `daily_limit`, `busy` | Per-IP bucket; per-visitor daily cap (retry at local midnight); one answer per visitor |
+| 429 | `rate_limited`, `daily_limit`, `busy` | Per-IP bucket; per-visitor daily cap (retry at local midnight); one answer per visitor (a running nudge is not an answer: the message cancels it) |
 | 503 | `demo_full`, `busy_global` | Visitor cap; global stream cap |
 | 500 | | Anything else: logged on the server, body "Something went wrong on the server." |
 
@@ -673,7 +683,8 @@ Client side (`public/js/api.js` `ApiError(kind, message, status, code)`):
 | `AbortError` | Stop pressed | Card marked stopped; the server saves the partial answer |
 
 Unverified prices render as a warning chip on the number (`markdown.js`); warnings render under the answer. A
-failed nudge is silent.
+failed nudge is silent. `chat.js` cancels its nudge request when the user opens another chat, and shows a nudge the
+server returned even if the user has started typing (the server returns one only if it stored it first).
 
 ---
 
@@ -760,12 +771,13 @@ No framework and no build step: `public/index.html` loads `js/main.js` as an ES 
 
 ## 8. Test map
 
-`npm test` runs `node --test test/*.test.ts` (113 tests on this branch, all passing). `npm run eval` runs the same
+`npm test` runs `node --test test/*.test.ts` (127 tests, all passing; `npm run report` records the count in `public/report/data.json` and flags a stale README). `npm run eval` runs the same
 scenarios with a readable report (131 checks).
 
 | File | Covers |
 |---|---|
-| `test/agent.test.ts` | Every eval scenario as a test; messages and searches stored with time; all searches failing (no invented prices); stop saves a partial answer and no claims; memory across sessions; FTS input with quotes and operators; empty and oversized input; "today" plus an earlier time; a nudge never lands between a question and its answer |
+| `test/nudge-lifecycle.test.ts` | A nudge dropped because the user typed first does not lose the change (next new chat announces it, once; "anything new?" reports it); a cancelled nudge passes its signal to searches and the model and writes nothing |
+| `test/agent.test.ts` | Every eval scenario as a test; messages and searches stored with time; `searches_message` index used, also on a database made before it; all searches failing (no invented prices); stop saves a partial answer and no claims; memory across sessions; FTS input with quotes and operators; empty and oversized input; "today" plus an earlier time; a nudge never lands between a question and its answer |
 | `test/router.test.ts` | Rules for small talk, recall, verify, "anything new"; deferring to the model; topic extraction; slow router falls back to search; model plans de-duplicated and capped at 5 |
 | `test/precision.test.ts` | `ownQuestion` routing; per-product search for a new question after small talk; small-talk re-check needs no search; price checker clause and citation rules; totals; number formats (`$5.00`, `5 USD`, `USD 5`, `₹499`, `Rs. 499`, `₹1,49,999`); "Unchanged, now confirmed"; the eval's independent price check; arithmetic and definitions need no search; `defang` |
 | `test/livegaps.test.ts` | Regressions from live runs: planner subjects; fan-out before a slow router; no answer-model search when sources exist; guard marks unsourced prices; source titles name products; invented price tracked as unverified; progress order; code-rendered "Last Tuesday = ..."; all 5 CRMs re-checked; canonical subjects and fair cap; "anything new?" bounds; "$50," parsing and plurals; search-model bullets as snippets; watchlist does not re-search after a nudge |
@@ -773,6 +785,6 @@ scenarios with a readable report (131 checks).
 | `test/claims.test.ts` | Value comparison; diff statuses; table rendering and pipe escaping; price guard basics; fixture grammar; non-money values compared as text; amount, currency and product checks; honest summary |
 | `test/timeparse.test.ts` | Yesterday, today, day before; weekdays incl. ambiguous "last Tuesday" and same-weekday; explicit dates both orders; dates later this year mean last year; invalid dates; relative spans; timezone (not UTC) ranges; ordinary words and "Monday.com" are not dates; parts of a day incl. last night past midnight; "on the 3rd" vs "the 2nd tier" |
 | `test/ui-stream.test.ts` | Search step events for searches, re-checks and cancellations; brand book; logo domain validation, public-address checks at connect time, image sniffing, icon link order, caching and fallback order, `LOGO_FETCH=0` |
-| `test/web.test.ts` | Markdown escaping and safe links; citations only to listed sources; then/now table rendering; date and quote blocks and unverified chips; SSE parser edge cases; `retryable` rules; sidebar date groups and clock input in the agent's timezone |
-| `test/demo.test.ts` | Demo config refuses weak secrets; cookie signing and rotation; demo off equals the single-user app; visitor isolation; tampered cookies; ledger persistence and the typed budget event; daily cap; per-IP limits and proxy trust; length, body and header caps with no internals in errors; demo full; one answer per visitor and the global cap; access code; TTL sweep keeps busy visitors |
+| `test/web.test.ts` | One rule picks the web_search version for answers and searches; Markdown escaping and safe links; citations only to listed sources; then/now table rendering; date and quote blocks and unverified chips; SSE parser edge cases; `retryable` rules; sidebar date groups and clock input in the agent's timezone |
+| `test/demo.test.ts` | Demo config refuses weak secrets; cookie signing and rotation; demo off equals the single-user app; visitor isolation; tampered cookies; ledger persistence and the typed budget event; daily cap; per-IP limits and proxy trust; length, body and header caps with no internals in errors; demo full; one answer per visitor and the global cap; access code; TTL sweep keeps busy visitors; typing cancels a running nudge (no 429, nothing written, change still reported); health and status name the real search provider; single-user mode sends the same security headers |
 | `eval/scenarios.ts` | 12 scenarios: `postgres-last-tuesday`, `crm-shortlist-monday`, `what-did-i-ask-on-3-nov`, `right-moment-nudge`, `fast-paths-and-follow-ups`, `time-phrases-late-night`, `recall-precision-same-day`, `small-talk-and-own-question`, `no-search-needed`, `grounding-formats`, `prompt-injection-in-results`, `watchlist-nothing-changed` |

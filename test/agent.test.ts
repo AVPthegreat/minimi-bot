@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { Agent, type AgentEvent } from "../src/agent.ts";
 import { Store } from "../src/db.ts";
@@ -113,4 +116,21 @@ test("a stopped turn stores no claims", async () => {
   }
   await agent.idle();
   assert.equal((store.db.prepare("SELECT COUNT(*) AS n FROM claims").get() as { n: number }).n, 0);
+});
+
+test("searches are looked up by message through an index, also in a database made before the index existed", () => {
+  const dir = mkdtempSync(join(tmpdir(), "minimi-db-"));
+  try {
+    const path = join(dir, "old.db");
+    const old = new Store(path);
+    old.db.exec("DROP INDEX IF EXISTS searches_message"); // the schema as it was
+    old.close();
+    const store = new Store(path); // opening runs the (idempotent) schema again
+    const plan = store.db.prepare("EXPLAIN QUERY PLAN SELECT * FROM searches WHERE message_id = ?").all(1) as Array<{ detail: string }>;
+    assert.ok(plan.some((p) => /USING INDEX searches_message/.test(p.detail)), JSON.stringify(plan));
+    store.close();
+    new Store(path).close(); // and again: no error the second time
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

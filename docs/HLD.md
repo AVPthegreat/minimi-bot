@@ -61,7 +61,7 @@ as fact when no current source backs it.
 | F5 | Store checkable facts ("claims") from answers: subject, attribute, value, unit, source URL and date. |
 | F6 | "Is that still correct?" re-checks the stored claims of the earlier answer and renders a then/now table in code. |
 | F7 | "Anything new?" re-checks the watchlist and shows at most 6 rows, changes first. |
-| F8 | A new chat may open with one nudge line if a watched fact changed. Never twice for the same change. |
+| F8 | A new chat may open with one nudge line if a watched fact changed. Never twice for the same change, and never lost: a change is saved only once the user is shown it. |
 | F9 | Stream the answer with typed events: status, search steps, sources, text, warnings, done. |
 | F10 | Mark any price that no current source supports as "(unverified)" before the user sees it. |
 | F11 | A stop button aborts the turn; the partial answer is saved and marked aborted; no claims are learned from it. |
@@ -319,23 +319,28 @@ sequenceDiagram
   participant H as Haiku recheck
   B->>API: new chat created
   B-->>B: chip Checking the facts I am watching
-  API->>A: nudge with a 12 s race
+  API->>A: nudge with an abort signal (12 s, client gone, or the visitor's next message)
   A->>D: session must be empty
   A->>W: checkWatchlist
   W->>D: dueClaims, older than 3 days, at most 3 subjects
   alt nothing due or WATCH_ENABLED=0
     W-->>A: null
   else facts due
-    W->>S: one recheck query per subject
-    W->>H: read current values
-    W->>D: save unchanged facts and the one announced change
-    W->>D: markRechecked for every checked fact
-    W-->>A: one nudge line or null
+    W->>S: one recheck query per subject (signal passed)
+    W->>H: read current values (signal passed)
+    W-->>A: nudge line or null, plus commit(shown); nothing written yet
   end
-  A->>D: session still empty? then store nudge as first message
+  alt aborted
+    A-->>API: null, nothing written
+  else session still empty and a change found
+    A->>D: commit(shown): unchanged facts and the announced change saved, all marked checked
+    A->>D: store nudge as first message (same synchronous step)
+  else user already typing
+    A->>D: commit(not shown): only unchanged facts saved; changed facts stay due
+  end
   A-->>API: message or null
   API-->>B: nudge text and sources, or nudge null
-  B-->>B: prepend the card only if the user has not started
+  B-->>B: prepend the card (the server stored it as the first message)
 ```
 
 "Never twice" is a data property: the announced change is written as a new claim version that supersedes the old
@@ -461,10 +466,11 @@ flowchart LR
 | XSS from model text | `markdown.js` escapes every character first, then adds its own tags; links must be http(s); citations link only to listed sources. `dom.js` inserts text as text. | `public/js/markdown.js`, `public/js/dom.js` |
 | FTS injection | User words are quoted as FTS5 strings (quotes stripped). | `Store.searchUserMessages` |
 | Abuse and cost | Spend caps; demo per-visitor daily cap, per-IP token buckets, concurrency caps, message and body caps, server timeouts. | `src/demo/*`, `src/server.ts` |
-| Clickjacking, sniffing | Demo: CSP (own origin, inline theme script by SHA-256 hash), `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, HSTS behind HTTPS. | `createDemoApp` `csp`, `before` |
+| Clickjacking, sniffing | Both modes: CSP (own origin, inline theme scripts by SHA-256 hash), `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, HSTS behind HTTPS. | `securityHeaders`, `before` |
 | Client IP spoofing | `X-Forwarded-For` is used only with `DEMO_TRUST_PROXY=1`, and then only its last entry (the one Caddy appended). | `clientIp` in `createDemoApp` |
 
-Single-user mode binds to `127.0.0.1` by default and sends no CSP or security headers (it is a local app). The logo
+Single-user mode binds to `127.0.0.1` by default and sends the same CSP and security headers as the demo (one
+`securityHeaders` in `src/app.ts`), so another site open in the same browser cannot frame or script it. The logo
 service sends the domain name, never user text, to the product's site and, as a last resort, to
 `icons.duckduckgo.com`.
 
@@ -508,8 +514,8 @@ searches per turn (subject cap, watchlist cap of 3 subjects) and a shared search
 | Model refusal, length limit, pause | A short closing line is appended. Refusals use the API's server-side fallback model first. | `AnthropicLLM.streamAnswer` |
 | User presses Stop or closes the tab | Abort signal stops search and model; partial answer saved with `aborted: true`; no claims, no re-check saved. | `route` `/api/chat`, `Agent.chat` |
 | Spend cap reached | `BudgetExceededError` before the call; in the demo a typed `demo_budget` error with how to run locally. | `UsageMeter.check`, `LedgerMeter.check` |
-| Nudge slow | 12 s race on the server; the chat is never delayed; the nudge simply does not appear. | `/api/sessions/:id/nudge` |
-| User types before the nudge returns | The nudge is not stored (session no longer empty) and the client does not prepend it. | `Agent.nudge`, `checkNudge` |
+| Nudge slow | After 12 s the server aborts it: its searches and model call are cancelled and it writes nothing; the chat is never delayed; the change stays pending for the next new chat. | `/api/sessions/:id/nudge`, `Agent.nudge` |
+| User types before the nudge returns | The nudge is not stored (session no longer empty) and its change is not saved: the next new chat announces it and "anything new?" reports it. In the demo the message cancels the running nudge instead of getting 429 busy. A change is saved only together with the nudge that shows it. | `Agent.nudge`, `checkWatchlist` `commit`, demo `admit` |
 | Logo fetch fails | A generated letter tile; misses cached for 1 day. | `LogoService`, `monogram` |
 | Server unreachable or stream cut | Typed `ApiError` (`network`, `http`, `cut`, `agent`) with a Retry button when retrying can help. | `public/js/api.js`, `chat.js` |
 
@@ -543,9 +549,9 @@ A key property is checked independently of the guard: "no price shown as fact wi
 answer text and fails on any unmarked price no source states (`eval/scenarios.ts`).
 
 **Measured:** live run 4 passed 106 of 107 checks (the miss was the check, fixed in commit `9aef87d`); on run 1's
-5 scenarios, run 4 passed 36 of 36 versus 26 of 36 in run 1. Offline: 131 of 131 eval checks. `data.json`
-records 100 of 100 tests; on this branch `npm test` now runs 113 tests, all passing (the demo tests were added after
-the report was built).
+5 scenarios, run 4 passed 36 of 36 versus 26 of 36 in run 1. Offline: 131 of 131 eval checks. `npm test`:
+127 of 127 tests, as recorded in `data.json` by `npm run report` (which reruns them and flags a README that quotes
+another count).
 
 ## 15. Scaling path
 
@@ -555,7 +561,7 @@ a reviewer demo of a few hundred visitors.
 | Scale | What breaks first | Change |
 |---|---|---|
 | 1 user (today) | Nothing. | As is. |
-| ~1k users (hosted) | One process serialises SQLite calls on the event loop; per-visitor files and LRU are fine; demo counters are in memory. | Keep per-user SQLite but add an index on `searches(message_id)`; move token buckets, stream counters and the ledger to Redis or Postgres so 2-4 processes can run behind the proxy with sticky routing by visitor id. Share a search-result cache keyed by (query, day) across users to cut the largest cost line. |
+| ~1k users (hosted) | One process serialises SQLite calls on the event loop; per-visitor files and LRU are fine; demo counters are in memory. | Keep per-user SQLite (`searches(message_id)` is already indexed); move token buckets, stream counters and the ledger to Redis or Postgres so 2-4 processes can run behind the proxy with sticky routing by visitor id. Share a search-result cache keyed by (query, day) across users to cut the largest cost line. |
 | ~100k users | File-per-user operations, backups and fan-out; long answers hold sockets; background work competes with streaming. | Postgres as the store (`messages`, `claims`, `searches` with a `user_id`; `tsvector` for keyword recall; `pgvector` for paraphrased recall). Stateless API processes. A queue (for example SQS or a Postgres-backed queue) for claim extraction, re-checks and a scheduled watchlist that precomputes nudges, so opening a chat reads a ready result. Per-tenant budgets and quotas. Streaming through a gateway with backpressure. |
 | Beyond | Search provider rate limits and cost; model capacity. | Batch watchlist re-checks per subject across users (one search serves everyone watching "Neon pricing"); provider pool with fallback; regional deployment. |
 

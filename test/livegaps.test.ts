@@ -15,6 +15,7 @@ import { AnthropicWebSearch } from "../src/search/anthropic.ts";
 import { FakeSearch } from "../src/search/fake.ts";
 import type { SearchProvider } from "../src/search/types.ts";
 import { FakeClock } from "../src/time.ts";
+import { MAX_ROWS_SHOWN } from "../src/watch.ts";
 
 async function run(agent: Agent, sid: string, text: string) {
   const events: AgentEvent[] = [];
@@ -185,9 +186,10 @@ test("canonical subjects and a fair cap", () => {
   assert.deepEqual(fairCap(items, 4, 3).map((x) => x.i), [0, 1, 4, 5]);
 });
 
-// ---- 5. "Anything new?" is bounded in code: at most 3 subjects, 2 facts each.
+// ---- 5. "Anything new?" is bounded in code: at most 3 subjects (every due fact of each, up to 8, shares
+// that subject's search), at most 6 table rows, and a line counts the facts checked but not shown.
 
-test("'anything new?' re-checks at most 3 subjects and 2 facts per subject", async () => {
+test("'anything new?' re-checks every fact of at most 3 subjects, shows at most 6 rows and counts the rest", async () => {
   const { clock, store, agent, log } = setup();
   const sid = agent.newSession().id;
   const subjects = ["Supabase", "Neon", "Railway", "HubSpot", "Pipedrive", "Close"];
@@ -199,7 +201,8 @@ test("'anything new?' re-checks at most 3 subjects and 2 facts per subject", asy
   const rows = text.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| What"));
   assert.ok(rows.length > 0);
   assert.ok(new Set(rows.map((l) => l.slice(2).split(":")[0])).size <= 3, "at most 3 subjects");
-  assert.ok(rows.length <= 6, "at most 2 facts per subject");
+  assert.equal(rows.length, MAX_ROWS_SHOWN, "3 subjects x 3 facts = 9 checked, 6 shown");
+  assert.match(text, /\(3 more facts checked: /, "the 3 not shown are counted");
   assert.ok(log.length <= 6, "one re-check + one news search per subject");
 });
 

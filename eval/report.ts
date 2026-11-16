@@ -190,3 +190,13 @@ console.log(`  same ${sameSuite.scenarios} scenarios: ${sameSuite.before.passed}
 const o = offline as ReturnType<typeof runOffline>;
 console.log(`  offline: ${o.eval.passed}/${o.eval.passed + o.eval.failed} eval checks, ${o.unitTests.passed}/${o.unitTests.total} unit tests`);
 console.log(`  total live spend $${data.totals.spendUsd.toFixed(2)}`);
+
+// The README quotes the offline counts; say so loudly when they no longer match the run just measured.
+const readme = readFileSync(join(ROOT, "README.md"), "utf8");
+const quoted = [...readme.matchAll(/\*\*(\d+) \/ (\d+)\*\* (eval checks|tests)|\| (\d+) tests:/g)].map((m) => ({ n: Number(m[1] ?? m[4]), kind: m[3] ?? "tests" }));
+const want = (kind: string) => (kind === "eval checks" ? o.eval.passed + o.eval.failed : o.unitTests.total);
+const stale = quoted.filter((q) => q.n !== want(q.kind));
+if (stale.length) {
+  console.error(`  README.md is out of date: it says ${stale.map((q) => `${q.n} ${q.kind}`).join(", ")}; the run counted ${o.unitTests.total} tests and ${o.eval.passed + o.eval.failed} eval checks.`);
+  process.exitCode = 1;
+}

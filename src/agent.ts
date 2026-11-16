@@ -109,18 +109,27 @@ export class Agent {
   /**
    * The "right moment" check for a fresh session: re-checks a few stale tracked facts and, only if
    * one changed, stores and returns one short nudge as the session's first message.
+   *
+   * A change is committed (saved as the fact's new value) only together with the nudge that shows it. If
+   * the user starts talking first, the nudge is dropped and the change stays pending for the next new chat
+   * and for "anything new?". If `signal` aborts (the server's time limit, the tab closed, the user's own
+   * message in the demo), the searches and model call are cancelled and nothing is written.
    */
-  async nudge(sessionId: string): Promise<{ messageId: number; nudge: Nudge } | null> {
+  async nudge(sessionId: string, signal?: AbortSignal): Promise<{ messageId: number; nudge: Nudge } | null> {
     const { store, clock, timezone } = this.deps;
-    if (!store.getSession(sessionId) || store.sessionMessages(sessionId).length > 0) return null;
+    if (signal?.aborted || !store.getSession(sessionId) || store.sessionMessages(sessionId).length > 0) return null;
     const now = clock.now();
-    const nudge = await checkWatchlist({ ...this.deps, tz: timezone }, sessionId, now, this.watch);
+    const check = await checkWatchlist({ ...this.deps, tz: timezone }, sessionId, now, this.watch, signal);
+    if (!check || signal?.aborted) return null;
     // The check took a while: if the user started talking meanwhile, drop the nudge rather than wedge it
-    // between their question and its answer. (node:sqlite is synchronous, so check-then-insert is atomic.)
-    if (!nudge || store.sessionMessages(sessionId).length > 0) return null;
-    const messageId = store.addMessage(sessionId, "assistant", nudge.text, now, { intent: "nudge", sources: nudge.sources.map(publicSource) });
+    // between their question and its answer. node:sqlite is synchronous, so from here to the insert
+    // nothing else runs: the check, the commit and the stored message happen together.
+    const shown = check.nudge !== null && store.sessionMessages(sessionId).length === 0;
+    check.commit(shown);
+    if (!shown || !check.nudge) return null;
+    const messageId = store.addMessage(sessionId, "assistant", check.nudge.text, now, { intent: "nudge", sources: check.nudge.sources.map(publicSource) });
     store.touchSession(sessionId, now, ""); // untitled (hidden in the sidebar) until the user writes
-    return { messageId, nudge };
+    return { messageId, nudge: check.nudge };
   }
 
   async *chat(sessionId: string, rawText: string, signal?: AbortSignal): AsyncGenerator<AgentEvent> {

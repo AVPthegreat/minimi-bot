@@ -39,28 +39,42 @@ export function createConversation({ log, composer }) {
     history.replaceState(null, "", id ? `#${id}` : location.pathname);
   }
 
+  /** The nudge request in flight; leaving the chat cancels it (the server then writes nothing). */
+  let nudgeAbort = null;
+
   /** The "right moment" check for a new chat: silent unless something you asked about changed. */
   async function checkNudge(id) {
     const chip = h("p", { class: "watch-check", role: "status" }, h("span", { class: "spinner", "aria-hidden": "true" }), "Checking the facts I'm watching…");
     log.querySelector(".home")?.append(chip);
+    const ac = new AbortController();
+    nudgeAbort = ac;
     try {
-      const n = await api.nudge(id);
-      if (n?.text && store.get().sessionId === id && !log.querySelector(".msg")) {
+      const n = await api.nudge(id, ac.signal);
+      // The server returns a nudge only if it stored it as this chat's first message, so show it first even
+      // if the user has started typing meanwhile: the change it reports is now recorded as seen.
+      if (n?.text && store.get().sessionId === id) {
         const card = assistantMessage({ content: n.text, sources: n.sources, intent: "nudge" }, { watch: false });
         card.setFollowups(renderFollowups("nudge", send));
         log.querySelector(".home")?.classList.add("home-compact");
         log.prepend(card.el);
-        log.scrollTop = 0;
+        if (log.querySelectorAll(".msg").length === 1) log.scrollTop = 0; // don't yank a reader away from an answer
       }
     } catch {
       /* a nudge is optional: no error for the user */
     } finally {
       chip.remove();
+      if (nudgeAbort === ac) nudgeAbort = null;
     }
+  }
+
+  function cancelNudge() {
+    nudgeAbort?.abort();
+    nudgeAbort = null;
   }
 
   async function newChat() {
     if (store.get().busy) stop();
+    cancelNudge();
     log.replaceChildren();
     setSession(null);
     showHome();
@@ -77,6 +91,7 @@ export function createConversation({ log, composer }) {
 
   async function openSession(id) {
     if (store.get().busy) stop();
+    cancelNudge();
     setSession(id);
     log.replaceChildren(h("div", { class: "loading", role: "status" }, h("span", { class: "spinner", "aria-hidden": "true" }), "Loading the conversation…"));
     try {

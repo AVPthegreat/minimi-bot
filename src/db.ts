@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS searches (
   results TEXT NOT NULL,
   fetched_at INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS searches_message ON searches(message_id);
 CREATE TABLE IF NOT EXISTS claims (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   message_id INTEGER REFERENCES messages(id),
