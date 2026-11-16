@@ -443,7 +443,8 @@ function createDemoApp(config: Config, demo: DemoConfig): App {
       return {
         ok: true,
         fake: config.fakeMode,
-        fakeReason: "hosted demo, offline test web",
+        // Never config.fakeReason here: in single-user mode it describes the server's .env file.
+        fakeReason: config.fakeMode ? "hosted demo, offline test web" : "",
         model: names.llm.name,
         search: names.search.name,
         timezone: tz,
@@ -485,6 +486,8 @@ function createDemoApp(config: Config, demo: DemoConfig): App {
         json(res, 200, {
           mode: "demo",
           fake: config.fakeMode,
+          model: names.llm.name,
+          search: names.search.name,
           budgetUsedPct: meter.usedPct(),
           budgetUsedUp: meter.spentUsd() >= demo.budgetUsd,
           visitors: registry.count(),

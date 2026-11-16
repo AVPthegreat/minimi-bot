@@ -420,3 +420,23 @@ test("typing wins over a running nudge: the nudge is cancelled (nothing written,
   assert.match(answerText(news.events), /\| Neon: Launch plan[^|]*\|[^\n]*Changed/);
   await stop(s);
 });
+
+test("demo health and status report the real search provider, not 'offline test web', when keys are set", async () => {
+  const live = { ...baseConfig(), fakeMode: false, fakeReason: "", searchProvider: "anthropic" as const, anthropicKey: "sk-ant-test-not-used" };
+  const s = await start(demoConfig(), live);
+  const b = browser(s.base);
+  const h = (await b.json("/api/health")).data;
+  assert.equal(h.fake, false);
+  assert.equal(h.fakeReason, "");
+  assert.equal(h.search, "anthropic-web-search");
+  const st = (await b.json("/api/demo/status")).data;
+  assert.equal(st.fake, false);
+  assert.equal(st.search, "anthropic-web-search");
+  await stop(s);
+  const offline = await start(demoConfig());
+  const o = (await browser(offline.base).json("/api/health")).data;
+  assert.equal(o.fake, true);
+  assert.equal(o.search, "fake");
+  assert.match(o.fakeReason, /offline test web/);
+  await stop(offline);
+});
