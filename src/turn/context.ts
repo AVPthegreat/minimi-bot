@@ -56,6 +56,8 @@ export class Turn {
   // ---- Answer (filled by the answer stage).
   answer = "";
   flagged: string[] = [];
+  /** The agent loop's record: follow-up searches run, and whether the planned round priced every named product. */
+  loop: { selfSearches: number; covered: boolean | null } = { selfSearches: 0, covered: null };
   warnings: string[] = [];
 
   constructor(

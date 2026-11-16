@@ -98,10 +98,14 @@ test("agent loop: a product the planned round missed is searched again (1 tool c
   const seen: number[] = [];
   const llm = openOnAnswer(new FakeLLM(search), state);
   const base = llm.streamAnswer.bind(llm);
-  llm.streamAnswer = (input: AnswerInput) => (seen.push(input.rounds.length), base(input));
+  const budgets: number[] = [];
+  llm.streamAnswer = (input: AnswerInput) => (seen.push(input.rounds.length), budgets.push(input.maxSelfSearches), base(input));
   const { store, agent } = make(llm, search, clock);
   const sid = agent.newSession().id;
   const { events, text } = await run(agent, sid, "Compare Neon and Supabase pricing");
+  assert.equal(budgets[0], 3, "a product without a priced source: the full budget");
+  const done = events.find((e) => e.type === "done");
+  assert.deepEqual(done?.type === "done" && done.loop, { selfSearches: 1, covered: false });
   assert.deepEqual(seen, [0, 1], "two model calls: one tool round, then the answer");
   const last = events.filter((e) => e.type === "sources").at(-1);
   const supa = last?.type === "sources" ? last.sources.find((s) => s.domain === "supabase.com") : undefined;

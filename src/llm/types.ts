@@ -62,6 +62,8 @@ export interface AnswerInput {
    * bounded loop; 0 = the tool is unavailable, write the answer now). Small talk and recall always get 0.
    */
   maxSelfSearches: number;
+  /** Computed in code: for each product the question names, the planned sources that give it a price (empty = a gap). */
+  coverage?: Array<{ subject: string; sources: number[] }>;
   /**
    * The tool rounds so far this turn, oldest first: what the model asked for and what the agent found.
    * `sources` above stays the planned round's evidence; sources found by the tool are in these results.

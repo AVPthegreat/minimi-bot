@@ -3,7 +3,7 @@
 // cited, the computed diff table), or it is marked "(unverified)" before the user sees it. Old answers
 // are not evidence for today's prices; only a pure recall answer may quote them, as history.
 
-import { type EvidenceDoc, priceChecker, questionMultipliers } from "../claims.ts";
+import { type EvidenceDoc, moneyIn, priceChecker, questionMultipliers } from "../claims.ts";
 import { GroundingGuard } from "../grounding.ts";
 import { NOT_NAMES } from "../planner.ts";
 import type { ToolCall, ToolRound } from "../llm/types.ts";
@@ -28,9 +28,14 @@ const SELF_SEARCH_RESULTS = 5;
 export async function* answer(t: Turn, web: boolean): AsyncGenerator<AgentEvent> {
   const { deps, intent, signal } = t;
   const max = deps.maxSelfSearches ?? 3;
-  const budget = web && Number.isInteger(max) ? Math.max(0, max) : 0;
   /** The planned round's sources: the model's first message stays the same across rounds. */
   const planned = t.sources.slice();
+  // Which named products the planned round already priced (computed in code, shown to the model). When
+  // every one is covered, a follow-up search is almost never worth its 10-20 s: allow at most one.
+  const coverage = web ? coverageOf(t.subjects, planned) : [];
+  const covered = coverage.length ? coverage.every((c) => c.sources.length > 0) : null;
+  const budget = web && Number.isInteger(max) ? Math.min(Math.max(0, max), covered ? 1 : Infinity) : 0;
+  t.loop = { selfSearches: 0, covered };
   const rounds: ToolRound[] = [];
   const selfRuns: QueryRun[] = [];
   let used = 0;
@@ -63,6 +68,7 @@ export async function* answer(t: Turn, web: boolean): AsyncGenerator<AgentEvent>
         shown: t.shown,
         highStakes: t.plan.highStakes,
         maxSelfSearches: left,
+        coverage,
         rounds,
         signal,
       })) {
@@ -93,6 +99,7 @@ export async function* answer(t: Turn, web: boolean): AsyncGenerator<AgentEvent>
         t.updates,
       );
       used += Math.max(1, run.length);
+      t.loop.selfSearches += run.length;
       selfRuns.push(...runs);
       const before = t.sources.length;
       const results = calls.map((c) => {
@@ -132,6 +139,17 @@ function addSources(t: Turn, run: QueryRun): Source[] {
     const source: Source = { ...r, n: t.sources.length + 1, official: isOfficialFor(r.url, [...t.plan.searchQueries, run.query]) };
     t.sources.push(source);
     return source;
+  });
+}
+
+/** Per named product: the planned sources that mention it with a price (empty = a gap worth a search). */
+export function coverageOf(subjects: string[], sources: Source[]): Array<{ subject: string; sources: number[] }> {
+  return subjects.map((subject) => {
+    const key = subject.toLowerCase().split(/\s+/)[0]!;
+    const sources_ = sources
+      .filter((s) => `${s.title} ${s.url} ${s.snippet}`.toLowerCase().includes(key) && moneyIn(`${s.title} ${s.snippet}`).length > 0)
+      .map((s) => s.n);
+    return { subject, sources: sources_ };
   });
 }
 

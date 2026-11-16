@@ -32,7 +32,7 @@ export type AgentEvent =
   | { type: "sources"; sources: PublicSource[] }
   | { type: "delta"; text: string }
   | { type: "warning"; text: string }
-  | { type: "done"; assistantMessageId: number; at: number; atLabel: string; timings: Timings }
+  | { type: "done"; assistantMessageId: number; at: number; atLabel: string; timings: Timings; loop: { selfSearches: number; covered: boolean | null } }
   | { type: "error"; message: string };
 
 export type SearchState = "running" | "done" | "failed" | "cancelled";

@@ -153,7 +153,7 @@ export class Agent {
     if (t.recheckToSave && !stopped) saveRecheck(store, t.recheckToSave, assistantId, sessionId, doneAt);
     if (!stopped) this.remember(t, assistantId, doneAt);
 
-    yield { type: "done", assistantMessageId: assistantId, at: doneAt, atLabel: formatLocal(doneAt, tz, doneAt), timings };
+    yield { type: "done", assistantMessageId: assistantId, at: doneAt, atLabel: formatLocal(doneAt, tz, doneAt), timings, loop: t.loop };
   }
 
   /**
