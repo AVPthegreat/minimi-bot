@@ -6,6 +6,7 @@
 // Everything the UI, the CLI and the eval use goes through this class.
 
 import { randomUUID } from "node:crypto";
+import { BrandBook } from "./brand.ts";
 import { type EvidenceDoc, priceChecker, questionMultipliers, renderDiffTable, sameValue, summarizeDiff } from "./claims.ts";
 import { GroundingGuard } from "./grounding.ts";
 import { canonicalSubject, fairCap, planSubjects, subjectQueries } from "./planner.ts";
@@ -34,12 +35,16 @@ export interface AgentDeps {
 export type AgentEvent =
   | { type: "turn"; sessionId: string; userMessageId: number; at: number; atLabel: string }
   | { type: "status"; text: string }
+  /** One web search's progress, for a step list in the UI (the status lines say the same in words). */
+  | { type: "search"; query: string; state: SearchState; results?: number; domain?: string }
   | { type: "route"; intent: Intent; via: RoutePlan["via"]; queries: string[] }
   | { type: "sources"; sources: PublicSource[] }
   | { type: "delta"; text: string }
   | { type: "warning"; text: string }
   | { type: "done"; assistantMessageId: number; at: number; atLabel: string; timings: Timings }
   | { type: "error"; message: string };
+
+export type SearchState = "running" | "done" | "failed" | "cancelled";
 
 export interface PublicSource {
   n: number;
@@ -73,6 +78,7 @@ const MAX_CLAIMS_PER_SUBJECT = 3;
 export class Agent {
   private readonly pending = new Set<Promise<unknown>>();
   private readonly watch: WatchConfig;
+  private readonly brands = new BrandBook();
 
   constructor(private readonly deps: AgentDeps) {
     this.watch = deps.watch ?? { enabled: true, afterDays: 3, maxSearches: 3 };
@@ -142,8 +148,15 @@ export class Agent {
       if (firstStatusMs === null) firstStatusMs = performance.now() - t0;
       return { type: "status", text: t };
     };
-    const onRun = (run: QueryRun, done: number, total: number) =>
+    // Search steps carry the product's site (for its logo): known names at once, the found site when done.
+    const step = (query: string, state: SearchState, results?: number, domain = this.brands.domainFor(query)): AgentEvent => ({
+      type: "search", query, state, ...(results === undefined ? {} : { results }), ...(domain ? { domain } : {}),
+    });
+    const onRun = (run: QueryRun, done: number, total: number) => {
+      updates.push(step(run.query, run.error ? "failed" : "done", run.results.length, this.brands.fromResults(run.query, run.results)));
       updates.push(status(`${run.error ? "Search failed" : `${run.results.length} result${run.results.length === 1 ? "" : "s"}`} for "${run.query}" (${done} of ${total} searches done)`));
+    };
+    const onStart = (query: string) => updates.push(step(query, "running"));
 
     // The agent owns the search plan. When the rules can't decide, the message is most likely a web
     // question, so the searches start right away while the router model decides: the raw question
@@ -169,9 +182,15 @@ export class Agent {
       yield status(subjects.length
         ? `Searching the web for ${subjects.join(", ")} (${planned.length} searches in parallel)`
         : `Searching the web: ${specQuery.slice(0, 120)}`);
+      for (const p of planned) yield step(p.query, "running");
     }
     const plan = await route(llm, routeInput, { timeoutMs: spec ? SPECULATIVE_ROUTER_TIMEOUT_MS : 4000 });
-    if (spec && plan.intent !== "search") specAbort.abort();
+    if (spec && plan.intent !== "search") {
+      specAbort.abort();
+      // Searches that finished meanwhile must not reappear after their "cancelled" step.
+      updates.drop((e) => e.type === "search");
+      for (const p of planned) yield step(p.query, "cancelled");
+    }
     const routeMs = performance.now() - t0;
     store.updateMessageMeta(userId, { intent: plan.intent });
     // Code found the subjects: that plan is already running. Otherwise the router's queries are added.
@@ -222,7 +241,7 @@ export class Agent {
           const nSubjects = new Set(claims.map((c) => c.subject.toLowerCase())).size;
           yield status(`Re-checking ${claims.length} fact${claims.length > 1 ? "s" : ""} about ${nSubjects} subject${nSubjects > 1 ? "s" : ""} from ${thenLabel}`);
           const maxQueries = plan.intent === "updates" ? this.watch.maxSearches : 5;
-          const outcome = yield* drain(recheckClaims(this.deps, claims, { nowMs: now, maxQueries, newsSinceDays: sinceDays, signal, onRun }), updates);
+          const outcome = yield* drain(recheckClaims(this.deps, claims, { nowMs: now, maxQueries, newsSinceDays: sinceDays, signal, onRun, onStart }), updates);
           runs.push(...outcome.runs);
           sources = outcome.sources;
           // "Anything new?" shows a short table (changes first); every fact was still re-checked and saved.
@@ -239,6 +258,7 @@ export class Agent {
           // model compare old answer and fresh sources.
           const q = memory[0]!.question.slice(0, 300);
           yield status(`Searching again: ${q}`);
+          yield step(q, "running");
           runs.push(...(yield* drain(runQueries(this.deps.search, [{ query: q, purpose: "verify-freeform" }], signal, onRun), updates)));
           sources = rankSources(runs, [], now);
         } else if (plan.intent === "updates") {
@@ -249,6 +269,7 @@ export class Agent {
 
       if (plan.intent === "search") {
         if (extra.length) yield status(`Searching the web: ${extra.join(" | ")}`);
+        for (const q of extra) yield step(q, "running");
         const extraRuns = extra.length
           ? runQueries(
               this.deps.search,
@@ -337,6 +358,7 @@ export class Agent {
         } else if (ev.type === "searching") {
           selfSearches.push(ev.query);
           yield status(`Searching the web: ${ev.query}`);
+          yield step(ev.query, "running"); // the model's own search: no per-search end, the UI closes it on "done"
         } else if (ev.type === "source") {
           if (addSource(ev.result).added) yield { type: "sources", sources: sources.map(publicSource) };
         } else if (ev.type === "cite") {
@@ -457,6 +479,9 @@ class Updates {
   }
   take(): AgentEvent[] {
     return this.items.splice(0);
+  }
+  drop(match: (e: AgentEvent) => boolean): void {
+    this.items = this.items.filter((e) => !match(e));
   }
   next(): Promise<void> {
     return new Promise((r) => (this.wake = r));
