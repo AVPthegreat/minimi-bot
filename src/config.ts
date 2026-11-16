@@ -49,7 +49,7 @@ export interface Config {
   tavilyKey: string;
   /** Hard cap on Anthropic spend per process, in USD (empty = no cap). */
   maxSpendUsd: number | null;
-  /** Web searches the answer model may run on its own per turn, only when the planned searches found nothing. */
+  /** Follow-up web searches the answer model may run itself per turn, after the planned round (the agent loop's bound). */
   answerMaxSearches: number;
   watchEnabled: boolean;
   watchAfterDays: number;

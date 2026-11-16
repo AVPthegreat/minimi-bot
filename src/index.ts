@@ -81,6 +81,7 @@ export function buildAgent(
     clock: parts.clock,
     timezone: config.timezone,
     maxSelfSearches: config.answerMaxSearches,
+    meter: parts.meter,
     watch: { enabled: config.watchEnabled, afterDays: config.watchAfterDays, maxSearches: config.watchMaxSearches },
     publicError: parts.publicError,
   });

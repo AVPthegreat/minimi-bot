@@ -29,32 +29,25 @@ export class FakeLLM implements LLM {
     return { intent: "search", memoryQuery: topic, searchQueries: queries, sinceDays: 0, highStakes: /pric|cost|\$/i.test(input.text) };
   }
 
-  /** `search` lets the fake model run its own searches, like the real one's bounded web_search loop. */
+  /** `search` given = this fake model uses its web_search tool (the agent runs the searches). */
   constructor(
     private readonly search?: SearchProvider,
     private readonly opts: { slowRouter?: boolean } = {},
   ) {}
 
   async *streamAnswer(input: AnswerInput): AsyncIterable<AnswerEvent> {
-    // Like the real model: given a search budget, it searches on its own before answering.
+    // Like the real model in the agent loop: it reads the planned sources first and calls web_search
+    // only for gaps (nothing found at all, or a product the question names that no source covers).
+    const all = withToolSources(input);
     if (input.intent === "search" && input.maxSelfSearches > 0 && this.search) {
-      const query = stopwordsTopic(input.question);
-      yield { type: "searching", query };
-      const found = (await this.search.search(query, { maxResults: 3, signal: input.signal })).filter((r) => grammarClaims(r.snippet).length);
-      for (const r of found) yield { type: "source", result: r };
-      if (found.length) {
-        yield { type: "text", text: `I searched again (as of ${input.nowLabel}):\n\n` };
-        for (const r of found) {
-          for (const f of r.snippet.match(/[A-Z][\w.]*(?: [A-Z][\w.]*)*: the [^.]+\./g) ?? []) {
-            yield { type: "text", text: `- ${f.replace(/\.$/, "")}` };
-            yield { type: "cite", url: r.url, title: r.title, citedText: f };
-            yield { type: "text", text: "\n" };
-          }
-        }
+      const asked = new Set(input.rounds.flatMap((r) => r.calls.map((c) => c.query.toLowerCase())));
+      const gaps = gapQueries(input.question, all).filter((q) => !asked.has(q.toLowerCase())).slice(0, input.maxSelfSearches);
+      if (gaps.length) {
+        for (const [i, query] of gaps.entries()) yield { type: "tool_call", id: `fake_${input.rounds.length}_${i}`, query };
         return;
       }
     }
-    for (const word of this.compose(input).split(/(?<=\s)/)) {
+    for (const word of this.compose({ ...input, sources: all }).split(/(?<=\s)/)) {
       if (input.signal?.aborted) return;
       yield { type: "text", text: word };
     }
@@ -142,4 +135,19 @@ export class FakeLLM implements LLM {
       return null;
     });
   }
+}
+
+/** The planned sources plus every page the tool found this turn (each once, by number). */
+function withToolSources(input: AnswerInput): AnswerInput["sources"] {
+  const all = [...input.sources];
+  for (const s of input.rounds.flatMap((r) => r.results.flatMap((x) => x.sources))) if (!all.some((a) => a.n === s.n)) all.push(s);
+  return all;
+}
+
+/** What the fake model searches for itself: the topic when nothing was found, else each named product no source covers. */
+function gapQueries(question: string, sources: AnswerInput["sources"]): string[] {
+  if (sources.length === 0) return [stopwordsTopic(question) || question];
+  const products = [...new Set((question.match(PRODUCT_RE) ?? []).filter((w) => !NOT_PRODUCTS.has(w)))];
+  const covered = (p: string) => sources.some((s) => `${s.title} ${s.url} ${s.snippet}`.toLowerCase().includes(p.toLowerCase().split(" ")[0]!));
+  return products.filter((p) => !covered(p)).map((p) => `${p} pricing`);
 }

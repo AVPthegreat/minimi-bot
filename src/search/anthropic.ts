@@ -11,8 +11,8 @@ import type { UsageMeter } from "../usage.ts";
 import type { SearchOptions, SearchProvider, SearchResult } from "./types.ts";
 
 /**
- * The ONE place that picks Anthropic's web_search tool version, for both the answer model's own searches
- * (`AnthropicLLM.streamAnswer`) and the search calls here. The newer version (dynamic filtering) is used on
+ * The ONE place that picks Anthropic's web_search tool version for the search calls here (the answer
+ * model's own follow-up searches also come through this provider: the agent runs them, turn/answer.ts). The newer version (dynamic filtering) is used on
  * every model that supports it: Fable, Mythos, and Opus/Sonnet 4.6 and later. Other models (the default
  * SEARCH_MODEL, Haiku, among them) are not documented for it, so they keep the basic version rather than
  * risk every search failing on a 400.

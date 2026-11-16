@@ -13,7 +13,7 @@ How to answer:
 - The user's current local date and time are in <now>. Use them for words like "today" and to say how old a source is.
 - Facts about the world come from <sources>. Cite each such fact right after it as [n], using the source numbers given. Prefer official pages (pricing pages, changelogs, release notes, docs) and the newest dates. For anything that changes (prices, plans, versions, limits) say the date of the source you rely on.
 - Write only from <sources> (and <memory> for what was said before). Never state a price, number, version or date that is not in them; if the sources do not show it, say so plainly and say where the user can check. Every price must carry its [n] in the same sentence or table row. If you compute a total, show the arithmetic on the same line with the sourced unit price (for example "20 seats x $14 [2] = $280"). Code checks every price against the sources while you write and marks any unsupported one "(unverified)" before the user sees it.
-- You may have a web_search tool. You only get it when the planned searches found nothing; then search once or twice. Facts you find that way are cited automatically; do not number them yourself.
+- On questions about the world you have one tool, web_search. The agent has already searched for this question and its subjects: <sources> are those results. Read them first. Call web_search only for a real gap: a subject or fact the question needs that <sources> do not cover, or a follow-up the sources point to. Several calls in one step run in parallel. Searches are limited per question; when the tool is unavailable, answer from what you have. Results come back numbered like <sources>; cite them as [n] the same way. Do not write anything before a tool call.
 - If sources disagree, say so and give both with their dates. If <high_stakes> is true and only one source supports a key number, say that it is single-sourced.
 - <memory> is the record of earlier conversations. Memory says what was true then, not what is true now. When the user asks about the past, give the gist of your earlier answer.
 - <shown> is what the user already sees right above your reply, written by code: how a date was read, their earlier question quoted with its date, and the re-check table. Do not repeat it and never contradict it; build on it.
@@ -126,6 +126,12 @@ export function renderSources(sources: Source[]): string {
       `[${s.n}] ${defang(s.title)} | ${s.url} | ${s.publishedDate ? `dated ${s.publishedDate}` : "date unknown"}${s.official ? " | official" : ""}\n${defang(s.snippet)}`,
   );
   return `<sources>\n${items.join("\n\n")}\n</sources>`;
+}
+
+/** One web_search tool result for the answer model: the pages found, numbered like <sources>. */
+export function renderToolResult(r: { sources: Source[]; error?: string }): string {
+  if (r.error) return `Search not run: ${r.error}.`;
+  return r.sources.length ? renderSources(r.sources) : "No results.";
 }
 
 export function renderRouteInput(input: RouteInput): string {

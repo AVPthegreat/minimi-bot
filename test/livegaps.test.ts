@@ -63,16 +63,18 @@ test("a comparison fans out one search per product, started before the (slow) ro
   for (const d of ["hubspot.com", "pipedrive.com", "salesforce.com", "zoho.com", "close.com"]) assert.ok(domains.includes(d), `${d} is a source`);
 });
 
-test("the answer model gets no web_search of its own when the agent's searches found sources", async () => {
+test("the answer model is offered web_search but does not search when the planned sources cover every subject", async () => {
   const budgets: number[] = [];
   const clock = new FakeClock("2026-11-10T10:00:00+05:30");
   const llm = new FakeLLM(new FakeSearch(clock), { slowRouter: true });
   const base = llm.streamAnswer.bind(llm);
   llm.streamAnswer = (input: AnswerInput) => (budgets.push(input.maxSelfSearches), base(input));
   const store = new Store(":memory:");
-  const agent = new Agent({ store, llm, search: new FakeSearch(clock), clock, timezone: "Asia/Kolkata" });
+  const search = new FakeSearch(clock);
+  const agent = new Agent({ store, llm, search, clock, timezone: "Asia/Kolkata" });
   await run(agent, agent.newSession().id, "What does Postgres hosting cost on Supabase, Neon and Railway?");
-  assert.deepEqual(budgets, [0]);
+  assert.deepEqual(budgets, [3], "one model call: the tool was available, no follow-up was needed");
+  assert.equal(search.log.length, 4, "only the planned round ran: the question + one per product");
 });
 
 // ---- 1b. Grounding enforced in code: an unsourced price never reaches the user as fact.
