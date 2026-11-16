@@ -11,7 +11,7 @@ import { formatLocal } from "./time.ts";
 
 const { agent, clock, config, llm, search } = createAgent();
 const PUBLIC = fileURLToPath(new URL("../public/", import.meta.url));
-const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml" };
+const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".png": "image/png", ".txt": "text/plain; charset=utf-8" };
 const MAX_BODY = 64 * 1024;
 const logos = new LogoService({
   dir: config.dbPath === ":memory:" ? null : join(dirname(config.dbPath), "logos"),
