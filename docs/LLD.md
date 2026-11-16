@@ -795,7 +795,7 @@ No framework and no build step: `public/index.html` loads `js/main.js` as an ES 
 
 ## 8. Test map
 
-`npm test` runs `node --test test/*.test.ts` (134 tests, all passing; `npm run report` records the count in `public/report/data.json` and flags a stale README). `npm run eval` runs the same
+`npm test` runs `node --test test/*.test.ts` (142 tests, all passing; `npm run report` records the count in `public/report/data.json` and flags a stale README). `npm run eval` runs the same
 scenarios with a readable report (131 checks).
 
 | File | Covers |

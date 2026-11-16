@@ -65,7 +65,9 @@ export class FakeLLM implements LLM {
         return out.join("\n\n");
       }
       for (const t of input.memory) {
-        const gist = t.answer.split("\n").filter((l) => l.trim() && !l.startsWith("**") && !l.startsWith("You asked on")).slice(0, 4).join("\n");
+        // Every fact line of the old answer (a comparison keeps all its products), not the first few lines.
+        const facts = t.answer.split("\n").filter((l) => /^- .*\$\d/.test(l)).slice(0, 12);
+        const gist = (facts.length ? facts : t.answer.split("\n").filter((l) => l.trim() && !l.startsWith("**") && !l.startsWith("You asked on")).slice(0, 4)).join("\n");
         out.push(`My answer then, in short:\n${gist}`);
       }
     }
@@ -78,7 +80,8 @@ export class FakeLLM implements LLM {
       for (const r of changed) out.push(`- ${r.subject} ${r.attribute}: ${r.oldValue} then, ${r.newValue} now${r.sourceN ? ` [${r.sourceN}]` : ""}.`);
       const thenDay = input.diff.thenLabel;
       const news = input.sources.filter((s) => !grammarClaims(s.snippet).length || /launch|shipped|news|cut/i.test(s.title));
-      if (news.length) out.push(`Since ${thenDay}:\n${news.map((s) => `- ${s.title} (${s.publishedDate ?? "undated"}) [${s.n}]`).join("\n")}`);
+      // Quoted and attributed: a headline like "We cut the Launch plan price" is the source's words, not ours.
+      if (news.length) out.push(`Since ${thenDay}:\n${news.map((s) => `- ${hostOf(s.url)}: "${s.title}" (${s.publishedDate ?? "undated"}) [${s.n}]`).join("\n")}`);
       return out.join("\n\n");
     }
     if (input.intent === "search") {
@@ -150,4 +153,12 @@ function gapQueries(question: string, sources: AnswerInput["sources"]): string[]
   const products = [...new Set((question.match(PRODUCT_RE) ?? []).filter((w) => !NOT_PRODUCTS.has(w)))];
   const covered = (p: string) => sources.some((s) => `${s.title} ${s.url} ${s.snippet}`.toLowerCase().includes(p.toLowerCase().split(" ")[0]!));
   return products.filter((p) => !covered(p)).map((p) => `${p} pricing`);
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "a source";
+  }
 }

@@ -160,6 +160,8 @@ export const SCENARIOS: Scenario[] = [
           tableRow("Neon: Launch plan", "Changed"),
           tableRow("Supabase: Pro plan", "Unchanged"),
           { name: "new Neon price $15 with a source", offlineOnly: true, ok: (r) => /\$15 per month \[\d\]/.test(r.text) },
+          { name: "the recap keeps every product, Railway too", offlineOnly: true, ok: (r) => /My answer then[\s\S]*Railway: the Hobby plan/.test(r.text) },
+          { name: "a source's headline is quoted and attributed, not said as ours", offlineOnly: true, ok: (r) => /neon\.com: "We cut the Launch plan price"/.test(r.text) && !/^- We cut/m.test(r.text) },
           noUnsupportedPrices,
         ],
       },
