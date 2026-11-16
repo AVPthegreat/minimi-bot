@@ -63,16 +63,26 @@ export function createAgent(config: Config = loadConfig()): Built {
   const clock = config.fixedNow || config.allowClockOverride ? new FakeClock(config.fixedNow || undefined) : null;
   const realClock = clock ?? new SystemClock();
   const meter = new UsageMeter(config.maxSpendUsd);
-  const { llm, search } = buildModels(config, realClock, meter);
-  const store = new Store(config.dbPath);
+  const { agent, llm, search } = buildAgent(config, { clock: realClock, meter, dbPath: config.dbPath });
+  return { agent, clock, config, llm, search, meter };
+}
+
+/** One agent from config plus the parts that vary per user (the hosted demo builds one per visitor). */
+export function buildAgent(
+  config: Config,
+  parts: { clock: Clock; meter: UsageMeter; dbPath: string; publicError?: (e: Error) => string },
+): { agent: Agent; llm: LLM; search: SearchProvider } {
+  const { llm, search } = buildModels(config, parts.clock, parts.meter);
+  const store = new Store(parts.dbPath);
   const agent = new Agent({
     store,
     llm,
     search,
-    clock: realClock,
+    clock: parts.clock,
     timezone: config.timezone,
     maxSelfSearches: config.answerMaxSearches,
     watch: { enabled: config.watchEnabled, afterDays: config.watchAfterDays, maxSearches: config.watchMaxSearches },
+    publicError: parts.publicError,
   });
-  return { agent, clock, config, llm, search, meter };
+  return { agent, llm, search };
 }

@@ -30,6 +30,8 @@ export interface AgentDeps {
   watch?: WatchConfig;
   /** Web searches the answer model may run itself when prefetched sources fall short (default 3, 0 = off). */
   maxSelfSearches?: number;
+  /** What a failure says to the user (the hosted demo hides provider details); default: the error's message. */
+  publicError?: (e: Error) => string;
 }
 
 export type AgentEvent =
@@ -392,9 +394,10 @@ export class Agent {
       }
     } catch (e) {
       if (!signal?.aborted) {
-        const d = out(`\n\n(The model failed before finishing: ${(e as Error).message})`);
+        const message = this.deps.publicError ? this.deps.publicError(e as Error) : (e as Error).message;
+        const d = out(`\n\n(The model failed before finishing: ${message})`);
         if (d) yield d;
-        yield { type: "error", message: (e as Error).message };
+        yield { type: "error", message };
       }
     }
     const tail = guard.end();
