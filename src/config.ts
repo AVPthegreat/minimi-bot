@@ -54,6 +54,8 @@ export interface Config {
   watchEnabled: boolean;
   watchAfterDays: number;
   watchMaxSearches: number;
+  /** Fetch site logos for the UI (server-side, cached); off = generated letter tiles only. */
+  logoFetch: boolean;
 }
 
 export function loadConfig(): Config {
@@ -90,5 +92,6 @@ export function loadConfig(): Config {
     watchEnabled: env("WATCH_ENABLED", "1") !== "0",
     watchAfterDays: Number(env("WATCH_AFTER_DAYS", "3")),
     watchMaxSearches: Number(env("WATCH_MAX_SEARCHES", "3")),
+    logoFetch: env("LOGO_FETCH", "1") !== "0",
   };
 }

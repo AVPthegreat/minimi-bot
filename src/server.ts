@@ -3,15 +3,21 @@
 
 import { readFile } from "node:fs/promises";
 import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
-import { extname, join, normalize } from "node:path";
+import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAgent } from "./index.ts";
+import { LogoService, cleanDomain, monogram } from "./logo.ts";
 import { formatLocal } from "./time.ts";
 
 const { agent, clock, config, llm, search } = createAgent();
 const PUBLIC = fileURLToPath(new URL("../public/", import.meta.url));
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml" };
 const MAX_BODY = 64 * 1024;
+const logos = new LogoService({
+  dir: config.dbPath === ":memory:" ? null : join(dirname(config.dbPath), "logos"),
+  enabled: config.logoFetch,
+  fallback: "https://icons.duckduckgo.com/ip3/{domain}.ico",
+});
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -76,6 +82,22 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       clockSettable: !!clock && config.allowClockOverride,
       watch: config.watchEnabled,
     });
+  }
+
+  if (req.method === "GET" && path === "/api/logo") {
+    // Always an image: the site's own logo when we have one, else a generated letter tile.
+    const domain = cleanDomain(url.searchParams.get("domain"));
+    if (!domain) throw new HttpError(400, "Give a plain domain, like ?domain=neon.com.");
+    const logo = (await logos.get(domain)) ?? monogram(domain);
+    const svg = logo.type === "image/svg+xml";
+    res.writeHead(200, {
+      "content-type": logo.type,
+      "cache-control": `public, max-age=${svg ? 3600 : 604800}`,
+      "x-content-type-options": "nosniff",
+      "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
+    });
+    res.end(logo.body);
+    return;
   }
 
   if (req.method === "POST" && path === "/api/clock") {
