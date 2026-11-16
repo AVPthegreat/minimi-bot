@@ -68,6 +68,13 @@ result count, the product's site) next to the old status lines, so older clients
 sniffed as raster images, size/time capped, cached in memory and on disk, a letter tile otherwise. Glass panels fall
 back to solid under `prefers-reduced-transparency` or without `backdrop-filter`; text tokens pass AA on the worst-case aurora.
 
+**Hosted demo** (`DEMO_MODE=1`, `src/app.ts` + `src/demo/`; off = the single-user app, same routes). Each route asks
+`ctx(req)` for the caller's agent: a random 128-bit visitor id in an HMAC-signed HttpOnly cookie maps to that visitor's
+own SQLite file, clock and Agent (opened lazily, LRU of 200, swept after `DEMO_TTL_DAYS`). One `LedgerMeter` (same
+prices as `usage.ts`) writes every call's cost to `demo.db` and refuses paid calls at `DEMO_BUDGET_USD`; chat then sends
+a typed `demo_budget` event. Per-visitor daily cap, per-IP token bucket, 1 answer per visitor / 8 globally, 2,000-char
+messages, CSP and frame-ancestors none. Runbook: `deploy/README-demo.md`. Rejected: one shared memory (privacy), accounts (friction).
+
 **Eval.** `eval/scenarios.ts` replays multi-day conversations on a fake clock against a fixture web whose prices
 change on known dates: the three example questions, nudges, time phrases (late night IST, "the 3rd", "yesterday
 evening"), same-day recall, small talk vs. a new question, rupees, contradicting sources, team totals, prompt

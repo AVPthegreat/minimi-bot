@@ -1,0 +1,23 @@
+# Sample Caddy site block for the hosted minimi demo (see deploy/README-demo.md).
+# Replace demo.example.com with your domain; its DNS must point at this server (ports 80 and 443 open).
+# Caddy obtains and renews the HTTPS certificate on its own.
+
+demo.example.com {
+	encode zstd gzip
+
+	# The app caps bodies too (DEMO_MAX_BODY_BYTES); refuse oversized ones before they reach it.
+	request_body {
+		max_size 64KB
+	}
+
+	reverse_proxy 127.0.0.1:8787 {
+		# Send each chunk of the answer stream as soon as it is written.
+		flush_interval -1
+		# Caddy keeps the Host header and sets X-Forwarded-For / X-Forwarded-Proto itself;
+		# the app trusts them only with DEMO_TRUST_PROXY=1.
+	}
+
+	log {
+		output file /var/log/caddy/minimi-demo.log
+	}
+}

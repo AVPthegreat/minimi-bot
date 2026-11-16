@@ -132,6 +132,18 @@ is easy to read, needs no build, and `npm run dev` stays one command. "How do yo
 first, then add only our own tags; links must be http(s); logos are re-served from our origin as sniffed images, and
 our letter tiles (SVG) carry a no-script CSP.
 
+## The hosted demo (DEMO_MODE=1)
+
+Reviewers can try minimi without a key: the server uses our key, but every visitor gets their own minimi (own memory
+file, chats and clock), recognised by a signed cookie, so nobody can see anyone else's chats. All visitors share one
+spend budget kept on disk ($18, under the provider's $20 limit); when it is used up the page says so and shows how to
+run the app locally. Daily, per-network and length limits, plus strict security headers, keep a public link safe.
+
+**Interview lines:** "How do you stop one visitor reading another's data?" There is no shared store to filter: the
+signed cookie picks a separate SQLite file, and a forged cookie just becomes a new, empty visitor (tested). "How do you
+cap cost on a public link?" A ledger checked before every paid call and written after it, so restarts can't reset it,
+plus a per-answer reserve so parallel answers can't overshoot much.
+
 ## 10 likely interview questions
 
 1. **Walk me through what happens when I ask "Last Tuesday I asked about Postgres hosting, has pricing changed?"**
