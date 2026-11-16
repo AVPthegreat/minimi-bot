@@ -4,6 +4,7 @@
 // fixture web (where prices change on known dates) and are skipped in live runs.
 
 import { Agent, type AgentEvent } from "../src/agent.ts";
+import { moneyIn, parseValue, questionMultipliers } from "../src/claims.ts";
 import { Store } from "../src/db.ts";
 import { FakeLLM } from "../src/llm/fake.ts";
 import type { LLM } from "../src/llm/types.ts";
@@ -23,12 +24,15 @@ export interface TurnResult {
   firstModelTokenMs?: number | null;
   totalMs: number;
   nudge?: string | null;
+  userMessageId?: number;
+  /** Prices the grounding guard could not match and showed as "(unverified)": honest, reported, not failures. */
+  unverified: string[];
 }
 
 export interface Check {
   name: string;
   offlineOnly?: boolean;
-  ok: (r: TurnResult, ctx: { store: Store }) => boolean;
+  ok: (r: TurnResult, ctx: { store: Store; question: string }) => boolean;
 }
 
 export interface Step {
@@ -54,7 +58,46 @@ const tableRow = (what: string, status: string): Check => ({
   offlineOnly: true,
   ok: (r) => r.text.split("\n").some((l) => l.startsWith("|") && l.includes(what) && l.includes(status)),
 });
-const noUnsupportedPrices: Check = { name: "every price is backed by a source", ok: (r) => !r.warnings.some((w) => w.includes("couldn't match")) };
+/**
+ * The promise is "no price is shown as fact without a source", checked independently of the guard:
+ * every price in the answer is either marked "(unverified)" or its amount is in what was gathered for
+ * this turn (search results logged in the store, the code-rendered table, or a sourced amount times a
+ * number from the question/line or 12). A price the guard flagged but that reached the user unmarked
+ * fails too. Honestly flagged prices are counted (TurnResult.unverified) and reported, not failed.
+ */
+export function pricesShownAsFactWithoutSource(r: TurnResult, store: Store, question: string): string[] {
+  const evidence: string[] = [r.text.split("\n").filter((l) => l.startsWith("|")).join("\n")];
+  if (r.userMessageId !== undefined) {
+    const rows = store.db.prepare("SELECT results FROM searches WHERE message_id = ?").all(r.userMessageId) as Array<{ results: string }>;
+    for (const row of rows) {
+      const results = JSON.parse(row.results) as Array<{ title?: string; snippet?: string }> | { error: string };
+      if (Array.isArray(results)) for (const x of results) evidence.push(`${x.title ?? ""}\n${x.snippet ?? ""}`);
+    }
+  }
+  if (r.intent === "recall") {
+    for (const m of store.db.prepare("SELECT content FROM messages WHERE role = 'assistant'").all() as Array<{ content: string }>) evidence.push(m.content);
+  }
+  const amounts = moneyIn(evidence.join("\n")).map((m) => parseValue(m).amount).filter((a): a is number => a !== null);
+  const bad: string[] = [];
+  for (const line of r.text.split("\n")) {
+    if (line.startsWith("|") && /\| (Unchanged|\*\*Changed\*\*|Couldn't verify|Unchanged, now confirmed) \|\s*$/.test(line)) continue; // code-rendered
+    const factors = [1, 12, ...questionMultipliers(question), ...questionMultipliers(line)];
+    for (const m of line.matchAll(/(?:[$€£₹]\s?\d[\d,]*(?:\.\d+)?(?:\s?[km]\b)?|\b(?:USD|EUR|GBP|INR|Rs\.?)\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:USD|EUR|GBP|INR)\b)/gi)) {
+      const price = m[0].replace(/,$/, "");
+      const a = parseValue(price).amount;
+      if (a === null) continue;
+      if (line.slice(m.index! + m[0].length).startsWith(" (unverified)")) continue;
+      if (!amounts.some((e) => factors.some((n) => Math.abs(e * n - a) <= 0.005 * Math.max(1, a)))) bad.push(price);
+    }
+  }
+  return [...new Set(bad)];
+}
+
+const noUnsupportedPrices: Check = {
+  name: "no price shown as fact without a source",
+  ok: (r, { store, question }) =>
+    pricesShownAsFactWithoutSource(r, store, question).length === 0 && r.unverified.every((p) => r.text.includes(`${p} (unverified)`)),
+};
 
 export const SCENARIOS: Scenario[] = [
   {
@@ -253,7 +296,7 @@ export async function runScenario(
     let result: TurnResult;
     if (step.openNewChat) {
       const n = await agent.nudge(sid);
-      result = { text: n?.nudge.text ?? "", sources: [], warnings: [], searches: searchCount, firstTokenMs: null, totalMs: 0, nudge: n?.nudge.text ?? null };
+      result = { text: n?.nudge.text ?? "", sources: [], warnings: [], searches: searchCount, firstTokenMs: null, totalMs: 0, nudge: n?.nudge.text ?? null, unverified: [] };
     } else {
       result = await collect(agent.chat(sid, step.say!));
       result.searches = searchCount;
@@ -266,7 +309,7 @@ export async function runScenario(
       result,
       checks: step.checks.map((c) => {
         const skipped = !!(opts.live && c.offlineOnly);
-        return { name: c.name, skipped, pass: skipped || safe(() => c.ok(result, { store })) };
+        return { name: c.name, skipped, pass: skipped || safe(() => c.ok(result, { store, question: step.say ?? "" })) };
       }),
     });
   }
@@ -283,14 +326,19 @@ function safe(f: () => boolean): boolean {
 }
 
 async function collect(events: AsyncGenerator<AgentEvent>): Promise<TurnResult> {
-  const r: TurnResult = { text: "", sources: [], warnings: [], searches: 0, firstTokenMs: null, totalMs: 0 };
+  const r: TurnResult = { text: "", sources: [], warnings: [], searches: 0, firstTokenMs: null, totalMs: 0, unverified: [] };
   for await (const ev of events) {
     if (ev.type === "delta") r.text += ev.text;
+    else if (ev.type === "turn") r.userMessageId = ev.userMessageId;
     else if (ev.type === "route") {
       r.intent = ev.intent;
       r.via = ev.via;
     } else if (ev.type === "sources") r.sources = ev.sources;
-    else if (ev.type === "warning") r.warnings.push(ev.text);
+    else if (ev.type === "warning") {
+      r.warnings.push(ev.text);
+      const flagged = /^I couldn't match (.+) to a current source/.exec(ev.text);
+      if (flagged) r.unverified.push(flagged[1]!);
+    }
     else if (ev.type === "done") {
       r.firstStatusMs = ev.timings.firstStatusMs;
       r.firstTokenMs = ev.timings.firstTokenMs;
