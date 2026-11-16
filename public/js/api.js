@@ -6,14 +6,17 @@ export class ApiError extends Error {
    * kind: "network" (server unreachable), "http" (server answered with an error), "cut" (the stream
    * ended before "done"), "agent" (the agent reported an error, e.g. the spend cap).
    */
-  constructor(kind, message, status = 0) {
+  constructor(kind, message, status = 0, code = "") {
     super(message);
     this.name = "ApiError";
     this.kind = kind;
     this.status = status;
+    /** The hosted demo's reason, e.g. "demo_budget", "daily_limit", "rate_limited" (empty otherwise). */
+    this.code = code;
   }
   /** Retrying could help (not for a spend cap or a rejected message). */
   get retryable() {
+    if (["demo_budget", "daily_limit", "too_long", "demo_full", "access_required"].includes(this.code)) return false;
     if (this.kind === "agent") return !/spend cap/i.test(this.message);
     return this.kind !== "http" || this.status >= 500 || this.status === 429;
   }
@@ -29,7 +32,7 @@ async function request(path, opts = {}) {
   }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new ApiError("http", data.error || `The server answered ${res.status}.`, res.status);
+    throw new ApiError("http", data.error || `The server answered ${res.status}.`, res.status, data.code || "");
   }
   return res;
 }
@@ -97,7 +100,7 @@ export async function* streamChat({ sessionId, text }, signal) {
       }
       if (chunk.done) break;
       for (const ev of parse(decoder.decode(chunk.value, { stream: true }))) {
-        if (ev.type === "done") finished = true;
+        if (ev.type === "done" || (ev.type === "error" && ev.final)) finished = true; // final: the demo refused the turn
         yield ev;
       }
     }

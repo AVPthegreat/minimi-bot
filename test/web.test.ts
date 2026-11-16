@@ -77,6 +77,9 @@ test("errors: retry is offered when it can help, not for a spend cap or a reject
   assert.equal(new ApiError("http", "oops", 500).retryable, true);
   assert.equal(new ApiError("agent", "Spend cap reached ($5.00 of $5.00).").retryable, false);
   assert.equal(new ApiError("agent", "overloaded").retryable, true);
+  assert.equal(new ApiError("http", "Too many messages.", 429, "rate_limited").retryable, true);
+  assert.equal(new ApiError("http", "Today's messages are used.", 429, "daily_limit").retryable, false);
+  assert.equal(new ApiError("agent", "The demo budget is used up.", 0, "demo_budget").retryable, false);
 });
 
 test("dates: sidebar groups and times follow the agent's timezone and clock", () => {

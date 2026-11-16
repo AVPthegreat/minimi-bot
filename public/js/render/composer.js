@@ -11,7 +11,8 @@ export function initComposer({ form, input, button, count }, { onSend, onStop })
     input.style.height = "auto";
     input.style.height = `${Math.min(220, input.scrollHeight)}px`;
     const n = input.value.length;
-    count.textContent = n > MAX - 400 ? `${n} / ${MAX}` : "";
+    const max = input.maxLength > 0 ? input.maxLength : MAX; // the hosted demo lowers it
+    count.textContent = n > max - 400 ? `${n} / ${max}` : "";
     button.disabled = !busy && !input.value.trim();
   };
 

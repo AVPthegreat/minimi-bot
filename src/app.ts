@@ -328,7 +328,7 @@ function createSingleUserApp(config: Config): App {
 // ---------------------------------------------------------------------------------------------
 // Hosted demo mode.
 
-const LOCAL_HINT = " The full app runs on your own machine in fake mode (no key needed): clone the repo and run `npm install && npm run dev`.";
+const LOCAL_HINT = " The full app runs on your own machine in fake mode, no key needed: clone the repo, then run npm install and npm run dev.";
 
 /** SHA-256 hashes of index.html's inline scripts, so the CSP can allow exactly those and nothing else. */
 function inlineScriptHashes(): string[] {
@@ -474,7 +474,7 @@ function createDemoApp(config: Config, demo: DemoConfig): App {
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
         const w = who.get(req)!;
         if (!registry.exists(w.id) && registry.count() >= demo.maxVisitors) {
-          htmlPage(res, 503, "The demo is full", `<p>Every demo seat is taken right now. Please try again later.</p><p>${LOCAL_HINT.trim().replace(/`([^`]+)`/g, "<code>$1</code>")}</p>`, 3600);
+          htmlPage(res, 503, "The demo is full", `<p>Every demo seat is taken right now. Please try again later.</p><p>${LOCAL_HINT.trim()}</p>`, 3600);
           return true;
         }
       }

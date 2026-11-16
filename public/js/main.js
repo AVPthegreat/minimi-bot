@@ -5,6 +5,7 @@ import { createConversation } from "./chat.js";
 import { $ } from "./dom.js";
 import { ICONS, hydrateIcons } from "./icons.js";
 import { renderBanner } from "./render/banner.js";
+import { renderDemoNotice } from "./render/demo.js";
 import { initComposer } from "./render/composer.js";
 import { renderEnv, renderSessions } from "./render/sidebar.js";
 import { store } from "./state.js";
@@ -40,6 +41,8 @@ store.subscribe((s, changed) => {
     if (s.health && document.activeElement !== el.clockInput) el.clockInput.value = localInputValue(s.health.now, s.health.timezone);
   }
   if (changed.some((k) => ["serverError", "online"].includes(k))) renderBanner(el.banner, s, boot);
+  if (changed.includes("health")) renderDemoNotice(el.banner, s.health, $("#input"));
+  if (changed.includes("busy") && !s.busy && s.health?.demo) loadHealth().catch(() => {}); // fresh "messages left"
   if (changed.includes("busy")) composer.setBusy(s.busy);
   if (changed.includes("sidebarOpen")) paintDrawer(s.sidebarOpen);
 });
