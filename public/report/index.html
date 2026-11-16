@@ -181,7 +181,7 @@
           <li><strong>SSRF-safe logo proxy.</strong> Site logos are fetched by the server over https from public addresses only (checked at connect time), size and time capped, sniffed as images and served with a strict content policy; otherwise a letter tile.</li>
           <li><strong>Web text is data.</strong> Search results that say "ignore previous instructions" are ignored and tag-like text is defanged; the live run tested it ("prompt-injection-in-results").</li>
           <li><strong>Safe rendering.</strong> The markdown renderer escapes every character before adding its own tags; links must be http(s).</li>
-          <li><strong>Spend cap.</strong> A usage meter stops live work at <code>MAX_SPEND_USD</code> (default $5).</li>
+          <li><strong>Spend cap.</strong> A usage meter stops model calls once <code>MAX_SPEND_USD</code> is reached; the live eval caps itself at $5 by default.</li>
         </ul>
       </div>
       <div>
