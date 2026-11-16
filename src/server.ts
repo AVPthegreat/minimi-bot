@@ -11,7 +11,7 @@ import { formatLocal } from "./time.ts";
 
 const { agent, clock, config, llm, search } = createAgent();
 const PUBLIC = fileURLToPath(new URL("../public/", import.meta.url));
-const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".png": "image/png", ".txt": "text/plain; charset=utf-8" };
+const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".png": "image/png", ".jpg": "image/jpeg", ".json": "application/json; charset=utf-8", ".txt": "text/plain; charset=utf-8" };
 const MAX_BODY = 64 * 1024;
 const logos = new LogoService({
   dir: config.dbPath === ":memory:" ? null : join(dirname(config.dbPath), "logos"),
@@ -165,7 +165,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   }
 
   if (req.method === "GET" && !path.startsWith("/api/")) {
-    const file = normalize(join(PUBLIC, path === "/" ? "index.html" : path));
+    // A path without an extension is a page folder: /report -> public/report/index.html.
+    const file = normalize(join(PUBLIC, extname(path) ? path : join(path, "index.html")));
     if (!file.startsWith(PUBLIC)) throw new HttpError(404, "Not found");
     try {
       const data = await readFile(file);
