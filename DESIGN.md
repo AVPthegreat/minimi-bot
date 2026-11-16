@@ -10,6 +10,8 @@ A pure agent loop searches one call at a time: slow, costly, hard to test. A pur
 **code plans the first round** (one search per subject a comparison names, in parallel), **then a bounded agentic
 loop**: the answer model may call `web_search` itself if those sources fall short, at most `ANSWER_MAX_SEARCHES` = 3
 times and within the spend meter. Every result is grounded the same way.
+Each turn runs one shared lifecycle in `Agent.chat` (store, route, dispatch, answer, persist); only evidence
+gathering differs by intent, so chat, recall, verify, updates and search are small handlers in `src/turn/handlers/`.
 
 ## Turn flow
 

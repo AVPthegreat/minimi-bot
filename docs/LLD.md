@@ -22,7 +22,8 @@ Contents:
 | `src/server.ts` | 30 | `app.ts` |
 | `src/app.ts` | 620 | `index.ts`, `demo/*`, `logo.ts`, `usage.ts`, `time.ts` |
 | `src/index.ts` | 90 | `agent.ts`, `db.ts`, `llm/*`, `search/*`, `usage.ts`, `time.ts` |
-| `src/agent.ts` | 550 | everything under `src/` except `app.ts`, `demo/*`, `logo.ts` |
+| `src/agent.ts` | 190 | `turn/*`, `db.ts`, `planner.ts`, `recheck.ts`, `watch.ts`, `timeparse.ts` |
+| `src/turn/*` | 640 | `route.ts` (routing + planned round), `handlers/{chat,recall,verify,updates,search}.ts`, `answer.ts` (loop + guard), `context.ts` (`Turn`), `progress.ts`, `types.ts` |
 | `src/router.ts` | 135 | `llm/types.ts` |
 | `src/planner.ts` | 100 | `router.ts` |
 | `src/timeparse.ts`, `src/time.ts` | 260, 130 | none |
@@ -50,13 +51,25 @@ Contents:
 - `buildAgent(config, {clock, meter, dbPath, publicError?})` opens a `Store` and constructs the `Agent`. The demo
   calls it once per visitor.
 
-### 2.2 `src/agent.ts`: the turn
+### 2.2 `src/agent.ts` and `src/turn/*`: the turn
+
+`Agent.chat` is the shared lifecycle only; everything that differs per intent is a handler. Per-turn state lives in
+one `Turn` object (`src/turn/context.ts`) that the stages read and fill; each stage is an async generator of
+`AgentEvent`, composed with `yield*`.
+
+| Stage | File | Does |
+|---|---|---|
+| Lifecycle | `src/agent.ts` `Agent.chat` | store the message, build the `Turn`, run the stages below, log searches, persist, `remember` (claims in the background), `done` |
+| Route | `src/turn/route.ts` `routeTurn` | rules, the planned (speculative) round started at once, router model, cancellation |
+| Dispatch | `src/turn/handlers/index.ts` `HANDLERS: Record<Intent, IntentHandler>` | `{ web: boolean; gather(t: Turn) }` per intent |
+| Handlers | `handlers/chat.ts`, `recall.ts`, `verify.ts`, `updates.ts`, `search.ts` | gather evidence into the `Turn` (memory, re-check table, search runs, sources) and code-rendered lines |
+| Answer | `src/turn/answer.ts` `answer(t, web)` | the bounded tool loop and the grounding guard |
 
 Public interface:
 
 ```ts
 class Agent {
-  constructor(deps: AgentDeps)            // store, llm, search, clock, timezone, watch?, maxSelfSearches?, publicError?
+  constructor(deps: AgentDeps)            // store, llm, search, clock, timezone, watch?, maxSelfSearches?, meter?, publicError?
   get store(): Store
   nowLabel(): string                      // "Mon 16 Nov 2026, 14:05 (Asia/Kolkata)"
   newSession(): SessionRow
@@ -66,10 +79,11 @@ class Agent {
 }
 ```
 
-Constants: `HISTORY_TURNS = 8`, `SPECULATIVE_ROUTER_TIMEOUT_MS = 1500`, `MAX_INPUT = 4000`,
-`MAX_STORED_CLAIMS = 15`, `MAX_CLAIMS_PER_SUBJECT = 3`.
+Constants: `HISTORY_TURNS = 8`, `MAX_INPUT = 4000`, `MAX_STORED_CLAIMS = 15`, `MAX_CLAIMS_PER_SUBJECT = 3` (agent.ts);
+`SPECULATIVE_ROUTER_TIMEOUT_MS = 1500` (route.ts); `MAX_VERIFY_CLAIMS = 12`, `MAX_VERIFY_SEARCHES = 5` (verify.ts);
+`SELF_SEARCH_RESULTS = 5` (answer.ts).
 
-`chat()` step by step:
+One turn step by step (steps 1-3 and 9-16 are `Agent.chat`; 4-7 `routeTurn`; 8 the handler; 10-13 `answer`):
 
 1. Trim and cut the text to 4,000 characters; empty gives an `error` event and returns.
 2. Create the session if unknown; `addMessage(user)`; `touchSession` (title = first 80 characters); emit `turn`.
@@ -84,10 +98,10 @@ Constants: `HISTORY_TURNS = 8`, `SPECULATIVE_ROUTER_TIMEOUT_MS = 1500`, `MAX_INP
    searches, drop queued `search` events (so no step finishes after its `cancelled`), and emit `cancelled` steps.
 7. `updateMessageMeta(user, {intent})`. `extra` = router queries, only when code found no subjects and only those
    not equal to the speculative query (`sameQuery` normalises case and punctuation). Emit `route`.
-8. Gather evidence (inside a try; a failure adds a note for the model instead of failing the turn):
-   - `recall` / `verify`: `recall(store, ...)`; emit code lines: the notes (date reading) and
+8. `HANDLERS[intent].gather(turn)` gathers evidence (inside a try; a failure adds a note for the model instead of failing the turn):
+   - `recall` (`recallMemory`, also the first step of `verify`): `recall(store, ...)`; emit code lines: the notes (date reading) and
      `You asked on <when>: "<question>"` per turn.
-   - `verify` / `updates`: claims are `dedupeClaims(memory claims, 12)` or `dueClaims(store, now, watch, true)`.
+   - `verify` / `updates` (shared `recheck(turn, claims, maxQueries)` in `verify.ts`): claims are `dedupeClaims(memory claims, 12)` or `dueClaims(store, now, watch, true)`.
      With claims: status "Re-checking N facts about K subjects from <then>"; `recheckClaims` with
      `maxQueries` 5 (verify) or `WATCH_MAX_SEARCHES` (updates) and `newsSinceDays` = days since the oldest
      `checked_at` (at least 1). Render `summarizeDiff` + `renderDiffTable` (+ a "(N more facts checked: ...)" line
@@ -98,17 +112,29 @@ Constants: `HISTORY_TURNS = 8`, `SPECULATIVE_ROUTER_TIMEOUT_MS = 1500`, `MAX_INP
      `rankSources(runs, subjects or router queries, now, max(8, 2 × subjects + 2), {coverEachQuery: subjects.length > 0})`.
 9. If every run failed: `warning` and (for search) a note "do not state current facts". Log every run with
    `store.logSearch`. Emit `sources`.
-10. `maxSelfSearches` = `ANSWER_MAX_SEARCHES` only for web intents with zero sources, else 0.
+10. The tool budget: `ANSWER_MAX_SEARCHES` (default 3; 1 when every named product already has a priced source) when the handler is `web` (search, verify, updates), else 0
+    (chat and recall never search). A non-integer bound counts as 0.
 11. Build the guard: `new GroundingGuard((line, before) => priceChecker(evidence(), {multipliers, names: names()})(line, shown + before))`.
     `evidence()` is recomputed per line (sources can grow during the stream): every source (`text` = title +
     snippet, `about` = site name + title + query), the diff table, and earlier answers as `pastOnly` evidence unless
     the intent is `recall`. `names()` = planned subjects, capitalised product words of the question, memory claim
     subjects and question words, diff subjects, source site names.
-12. Stream `llm.streamAnswer(...)` (intent `updates` is sent as `verify`). `text` goes through `guard.push`;
-    `searching` emits a status and a running step; `source` and `cite` add to the source list (a cite appends the
-    cited text to that source's snippet and writes ` [n]` through the guard). On an exception (not an abort): a
-    short failure line through the guard and an `error` event with `publicError(e)` or the message.
-13. `guard.end()` releases the held tail. Log the model's own searches. Emit one `warning` per flagged price.
+12. The agent loop (`answer`): each round calls `llm.streamAnswer` with `maxSelfSearches` = searches left and
+    `rounds` = the earlier tool rounds (`sources` stays the planned round's, so the first message is stable).
+    `text` goes through `guard.push`; `tool_call` events are collected. No calls, no budget left, or an abort: the
+    answer is done. Otherwise check the spend meter (`deps.meter.check()`; if the cap is reached, append "(I stopped
+    searching here: the spend cap is reached.)" and stop), then run up to `left` calls in parallel with
+    `runQueries(..., purpose "self-search", maxResults 5)` through `drain` (a `Searching again: <q>` status and a
+    `search` step per call, closed by `onRun`). Calls beyond the budget get the result `search budget for this
+    turn is used up`. Each run is ranked (`rankSources`) and its pages appended to `turn.sources` with the next
+    numbers (a URL already there keeps its number); emit `sources`; push the `ToolRound {text, calls, results,
+    state}` and loop. `used` grows by at least 1 per round, so the loop makes at most `budget + 1` model calls.
+    Before round 1, code computes `coverageOf(subjects, planned sources)`: per named product, the sources that name
+    it with a price. It goes to the model as `<coverage>` ("Neon: priced in [2]" / "Close: NO priced source"); when
+    every product is covered the budget is capped at 1. The `done` event reports `loop {selfSearches, covered}`.
+    On an exception (not an abort): a short failure line through the guard and an `error` event with
+    `publicError(e)` or the message.
+13. `guard.end()` releases the held tail. Log the loop's searches (`self-search`). Emit one `warning` per flagged price.
 14. Save the assistant message with meta `{intent, via, replyTo, sources, warnings, notes, timings, aborted}`.
     If a re-check ran and the turn was not stopped: `saveRecheck`.
 15. Background (not stopped, intent `search` or a freeform `verify`, sources and text present): `extractClaims`,
@@ -118,7 +144,7 @@ Constants: `HISTORY_TURNS = 8`, `SPECULATIVE_ROUTER_TIMEOUT_MS = 1500`, `MAX_INP
 
 Helpers: `Updates` is a small queue with a wake promise; `drain(p, updates)` is an async generator that yields
 queued progress events while awaiting `p`, then returns `p`'s value (used with `yield*`). This is how parallel
-search completions become stream events in order. `turnsForClaims` maps tracked claims back to their original
+search completions become stream events in order (`src/turn/progress.ts`). `turnsForClaims` (`handlers/updates.ts`) maps tracked claims back to their original
 questions (via `rootClaim` and `questionFor`, at most 3) for "anything new?". `publicSource` adds a 160-character
 quote line for the source card.
 
@@ -400,7 +426,7 @@ or cancelled, leaves the old value as the head and the fact due, so the next new
 interface LLM {
   readonly name: string;
   route(input: RouteInput): Promise<Omit<RoutePlan, "via">>;
-  streamAnswer(input: AnswerInput): AsyncIterable<AnswerEvent>;      // text | searching | source | cite
+  streamAnswer(input: AnswerInput): AsyncIterable<AnswerEvent>;      // text | tool_call | round_state (one round of the loop)
   extractClaims(input: { question; answer; sources }): Promise<NewClaim[]>;
   recheck(input: { claims; sources }): Promise<Array<RecheckResult | null>>;
 }
@@ -413,12 +439,12 @@ interface LLM {
 | `route` | `FAST_MODEL` | JSON schema output (`ROUTER_SCHEMA`: intent chat/recall/verify/search, queries, since_days 0-365, memory_query, high_stakes), effort low, 4 s, 1 retry, 1,024 tokens |
 | `extractClaims` | `FAST_MODEL` | `EXTRACT_SCHEMA`, 20 s, 4,096 tokens; at most 24 claims; `source_n` mapped to a source URL and date |
 | `recheck` | `FAST_MODEL` | `RECHECK_SCHEMA`, 15 s, 4,096 tokens |
-| `streamAnswer` | `ANSWER_MODEL` | `beta.messages.stream`, 16,000 max tokens, system prompt cached (`ephemeral`), effort low for chat/recall else `ANSWER_EFFORT`, web_search tool (version from the same `webSearchTool(ANSWER_MODEL)`, so `web_search_20260209` on the default Opus) only when `maxSelfSearches > 0`, server-side fallback beta, optional `speed: fast` |
+| `streamAnswer` | `ANSWER_MODEL` | `beta.messages.stream`, 16,000 max tokens, system prompt cached (`ephemeral`), effort low for chat/recall else `ANSWER_EFFORT`, a client tool `web_search` (`{query}`; the agent runs it) defined when `maxSelfSearches > 0` or earlier rounds exist, `tool_choice: none` once the budget is 0, earlier rounds replayed as assistant `tool_use` + user `tool_result` messages (`renderRounds`, `renderToolResult`), server-side fallback beta, optional `speed: fast` |
 
-Stream mapping: `text_delta` gives `text`; a `server_tool_use` block's JSON input gives `searching` at its end;
-`web_search_tool_result` gives `source` per result; `citations_delta` is buffered and emitted as `cite` at the end
-of its text block so `[n]` follows the claim. Stop reasons `refusal`, `max_tokens` and `pause_turn` append one
-closing line. Every call runs `meter.check()` first and `meter.add()` after.
+Stream mapping: `text_delta` gives `text`; a `tool_use` block's JSON input gives `tool_call {id, query}` at its end;
+when the stop reason is `tool_use`, `round_state` carries the assistant content blocks so the next round replays them
+exactly. Stop reasons `refusal` and `max_tokens` append one closing line. Every call runs `meter.check()` first and
+`meter.add()` after.
 
 `prompts.ts` holds every prompt. System prompts are fixed strings (a byte-stable, cacheable prefix); everything per
 turn goes into the user turn as tagged sections: `<now>`, `<high_stakes>`, `<memory>`, `<comparison>`, `<shown>`,
@@ -426,7 +452,8 @@ turn goes into the user turn as tagged sections: `<now>`, `<high_stakes>`, `<mem
 sections (or `system`, `instructions`, `facts`) with `[tag removed]`.
 
 `FakeLLM` (`fake.ts`) is deterministic: routes with the same rules, writes only facts it can read with
-`grammarClaims`, and copies live behaviours that hid bugs: it searches on its own when given a tool, does not repeat
+`grammarClaims`, and copies live behaviours that hid bugs: given a search budget it calls `web_search` for gaps (nothing found, or a
+named product no source covers), does not repeat
 notes, paraphrases earlier questions, and with `slowRouter` its router always fails.
 
 ### 2.13 `src/usage.ts` and `src/demo/budget.ts`: spend meter and budget
@@ -551,7 +578,7 @@ CREATE TABLE searches (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   message_id INTEGER NOT NULL REFERENCES messages(id),   -- the user message
   query TEXT NOT NULL,
-  provider TEXT NOT NULL,                    -- tavily | anthropic-web-search | fake | answer-model web_search
+  provider TEXT NOT NULL,                    -- tavily | anthropic-web-search | fake (self-search rows use the same provider)
   purpose TEXT NOT NULL,                     -- speculative | answer | recheck | news-since | verify-freeform | self-search
   results TEXT NOT NULL,                     -- JSON results, or {"error": "..."}
   fetched_at INTEGER NOT NULL
@@ -702,14 +729,14 @@ Read once in `src/config.ts` `loadConfig` (values from `.env` fill only unset or
 | `ANSWER_MODEL` | `claude-opus-5-5` | Streams answers |
 | `FAST_MODEL` | `claude-haiku-5-5` | Routing, extraction, re-check reading |
 | `SEARCH_MODEL` | `claude-haiku-5-5` | Runs Claude `web_search` calls |
-| `ANSWER_EFFORT` | `medium` | Effort for web answers (chat and recall always use `low`) |
+| `ANSWER_EFFORT` | `medium` | Effort for web answers (chat and recall always use `low`); must be low, medium or high |
 | `FAST_OUTPUT` | off | `1` = `speed: fast` on the **answer** model |
-| `ANSWER_MAX_SEARCHES` | 3 | The answer model's own searches when planned ones found nothing (clamped 0-5) |
+| `ANSWER_MAX_SEARCHES` | 3 | Bound of the agent loop: follow-up searches the answer model may run per turn after the planned round (whole number, capped at 5) |
 | `MAX_SPEND_USD` | none | Per-process spend cap (ignored in demo mode) |
 | `WATCH_ENABLED` | 1 | `0` turns nudges off |
 | `WATCH_AFTER_DAYS` | 3 | Age before a fact is due |
 | `WATCH_MAX_SEARCHES` | 3 | Subjects per watchlist check and per "anything new?" |
-| `USER_TIMEZONE` | `Asia/Kolkata` | Display and day boundaries |
+| `USER_TIMEZONE` | the system zone (`Intl`) | Display and day boundaries; an unknown zone refuses to start |
 | `MINIMI_NOW` | empty | Fixed "now" (ISO 8601) |
 | `ALLOW_CLOCK_OVERRIDE` | off | `1` lets the UI move the clock with real keys (always on in fake mode) |
 | `LOGO_FETCH` | 1 | `0` = letter tiles only, no network |
@@ -771,8 +798,8 @@ No framework and no build step: `public/index.html` loads `js/main.js` as an ES 
 
 ## 8. Test map
 
-`npm test` runs `node --test test/*.test.ts` (127 tests, all passing; `npm run report` records the count in `public/report/data.json` and flags a stale README). `npm run eval` runs the same
-scenarios with a readable report (131 checks).
+`npm test` runs `node --test test/*.test.ts` (142 tests, all passing; `npm run report` records the count in `public/report/data.json` and flags a stale README). `npm run eval` runs the same
+scenarios with a readable report (139 checks; `EVAL_ONLY=a,b` limits it to those scenarios).
 
 | File | Covers |
 |---|---|
@@ -780,11 +807,12 @@ scenarios with a readable report (131 checks).
 | `test/agent.test.ts` | Every eval scenario as a test; messages and searches stored with time; `searches_message` index used, also on a database made before it; all searches failing (no invented prices); stop saves a partial answer and no claims; memory across sessions; FTS input with quotes and operators; empty and oversized input; "today" plus an earlier time; a nudge never lands between a question and its answer |
 | `test/router.test.ts` | Rules for small talk, recall, verify, "anything new"; deferring to the model; topic extraction; slow router falls back to search; model plans de-duplicated and capped at 5 |
 | `test/precision.test.ts` | `ownQuestion` routing; per-product search for a new question after small talk; small-talk re-check needs no search; price checker clause and citation rules; totals; number formats (`$5.00`, `5 USD`, `USD 5`, `₹499`, `Rs. 499`, `₹1,49,999`); "Unchanged, now confirmed"; the eval's independent price check; arithmetic and definitions need no search; `defang` |
-| `test/livegaps.test.ts` | Regressions from live runs: planner subjects; fan-out before a slow router; no answer-model search when sources exist; guard marks unsourced prices; source titles name products; invented price tracked as unverified; progress order; code-rendered "Last Tuesday = ..."; all 5 CRMs re-checked; canonical subjects and fair cap; "anything new?" bounds; "$50," parsing and plurals; search-model bullets as snippets; watchlist does not re-search after a nudge |
-| `test/loop.test.ts` | Speculative search within the router budget; cancellation when no search is needed; bounded answer-model search loop and its citations; loop off for chat and recall; stale copied price flagged; "nothing changed" never claimed with unverified facts; Anthropic search makes one call per query in parallel |
+| `test/livegaps.test.ts` | Regressions from live runs: planner subjects; fan-out before a slow router; the tool is offered but unused when the planned sources cover every product; guard marks unsourced prices; source titles name products; invented price tracked as unverified; progress order; code-rendered "Last Tuesday = ..."; all 5 CRMs re-checked; canonical subjects and fair cap; "anything new?" bounds; "$50," parsing and plurals; search-model bullets as snippets; watchlist does not re-search after a nudge |
+| `test/loop.test.ts` | Speculative search within the router budget; cancellation when no search is needed; agent loop: follow-up pages become cited, grounded sources; a missed product is searched again in one tool call; bounded (budgets 3, 1, 0; 3 searches; the 4th call refused); the spend cap stops searching; zero searches for chat, recall and arithmetic; stale copied price flagged; "nothing changed" never claimed with unverified facts; Anthropic search makes one call per query in parallel |
 | `test/claims.test.ts` | Value comparison; diff statuses; table rendering and pipe escaping; price guard basics; fixture grammar; non-money values compared as text; amount, currency and product checks; honest summary |
 | `test/timeparse.test.ts` | Yesterday, today, day before; weekdays incl. ambiguous "last Tuesday" and same-weekday; explicit dates both orders; dates later this year mean last year; invalid dates; relative spans; timezone (not UTC) ranges; ordinary words and "Monday.com" are not dates; parts of a day incl. last night past midnight; "on the 3rd" vs "the 2nd tier" |
 | `test/ui-stream.test.ts` | Search step events for searches, re-checks and cancellations; brand book; logo domain validation, public-address checks at connect time, image sniffing, icon link order, caching and fallback order, `LOGO_FETCH=0` |
 | `test/web.test.ts` | One rule picks the web_search version for answers and searches; Markdown escaping and safe links; citations only to listed sources; then/now table rendering; date and quote blocks and unverified chips; SSE parser edge cases; `retryable` rules; sidebar date groups and clock input in the agent's timezone |
-| `test/demo.test.ts` | Demo config refuses weak secrets; cookie signing and rotation; demo off equals the single-user app; visitor isolation; tampered cookies; ledger persistence and the typed budget event; daily cap; per-IP limits and proxy trust; length, body and header caps with no internals in errors; demo full; one answer per visitor and the global cap; access code; TTL sweep keeps busy visitors; typing cancels a running nudge (no 429, nothing written, change still reported); health and status name the real search provider; single-user mode sends the same security headers |
+| `test/config.test.ts` | Time zone defaults to the system zone, `USER_TIMEZONE` overrides, unknown zones refused; `ANSWER_EFFORT`, `PORT` and the other numbers validated (no NaN) |
+| `test/demo.test.ts` | Single-user `/api/chat` refuses an empty message before creating a session; demo config refuses weak secrets; cookie signing and rotation; demo off equals the single-user app; visitor isolation; tampered cookies; ledger persistence and the typed budget event; daily cap; per-IP limits and proxy trust; length, body and header caps with no internals in errors; demo full; one answer per visitor and the global cap; access code; TTL sweep keeps busy visitors; typing cancels a running nudge (no 429, nothing written, change still reported); health and status name the real search provider; single-user mode sends the same security headers |
 | `eval/scenarios.ts` | 12 scenarios: `postgres-last-tuesday`, `crm-shortlist-monday`, `what-did-i-ask-on-3-nov`, `right-moment-nudge`, `fast-paths-and-follow-ups`, `time-phrases-late-night`, `recall-precision-same-day`, `small-talk-and-own-question`, `no-search-needed`, `grounding-formats`, `prompt-injection-in-results`, `watchlist-nothing-changed` |

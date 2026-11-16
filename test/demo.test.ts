@@ -16,6 +16,7 @@ import { TokenBuckets } from "../src/demo/limits.ts";
 import { DemoRegistry } from "../src/demo/registry.ts";
 import { VisitorPool } from "../src/demo/visitors.ts";
 import { type Config, loadConfig } from "../src/config.ts";
+import { Store } from "../src/db.ts";
 import { BudgetExceededError } from "../src/usage.ts";
 
 process.env.FAKE_MODE = "1";
@@ -447,4 +448,19 @@ test("demo health and status report the real search provider, not 'offline test 
   assert.equal(o.search, "fake");
   assert.match(o.fakeReason, /offline test web/);
   await stop(offline);
+});
+
+test("single-user app: an empty message is refused with 400 before any session is created", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "minimi-empty-test-"));
+  dirs.push(dir);
+  const dbPath = join(dir, "m.db");
+  const s = await start(null, baseConfig(dbPath));
+  const b = browser(s.base);
+  const r = await b.chat("   ");
+  assert.equal(r.status, 400);
+  assert.match(String(r.error?.error ?? JSON.stringify(r.error)), /Say something first/);
+  const store = new Store(dbPath);
+  assert.equal((store.db.prepare("SELECT COUNT(*) AS n FROM sessions").get() as { n: number }).n, 0, "no empty session was created");
+  store.db.close();
+  await stop(s);
 });

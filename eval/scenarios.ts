@@ -18,7 +18,12 @@ export interface TurnResult {
   via?: string;
   sources: Array<{ n: number; url: string; date?: string }>;
   warnings: string[];
+  /** Searches of the planned round (speculative, per product, router, re-checks): the agent's own plan. */
   searches: number;
+  /** Follow-up searches the answer model ran itself in the agent loop. */
+  selfSearches?: number;
+  /** Whether the planned round gave every named product a priced source (null = no named products). */
+  covered?: boolean | null;
   firstStatusMs?: number | null;
   firstTokenMs: number | null;
   firstModelTokenMs?: number | null;
@@ -56,7 +61,10 @@ export interface Scenario {
 
 const has = (s: string) => (r: TurnResult) => r.text.toLowerCase().includes(s.toLowerCase());
 const intent = (i: string): Check => ({ name: `intent is ${i}`, ok: (r) => r.intent === i });
-const noSearch: Check = { name: "no web search", ok: (r) => r.searches === 0 };
+const noSearch: Check = { name: "no web search", ok: (r) => r.searches === 0 && !r.selfSearches };
+/** Live-meaningful: the model searches again only for a gap, never when the planned round priced every product. */
+const noSelfSearchWhenCovered: Check = { name: "agent loop: no self-search when every product has a priced source", ok: (r) => r.covered !== true || !r.selfSearches };
+const selfSearchesBounded: Check = { name: "agent loop: self-searches <= ANSWER_MAX_SEARCHES (3)", ok: (r) => (r.selfSearches ?? 0) <= 3 };
 const tableRow = (what: string, status: string): Check => ({
   name: `table: ${what} -> ${status}`,
   offlineOnly: true,
@@ -140,7 +148,9 @@ export const SCENARIOS: Scenario[] = [
         say: "What does Postgres hosting cost on Supabase, Neon and Railway?",
         checks: [
           intent("search"),
-          { name: "one search per product + the speculative one, in parallel", ok: (r) => r.searches === 4 },
+          { name: "planned round: one search per product + the speculative one, in parallel", ok: (r) => r.searches === 4 },
+          noSelfSearchWhenCovered,
+          selfSearchesBounded,
           { name: "cites at least 3 sources", ok: (r) => r.sources.length >= 3 },
           { name: "states Neon's price", offlineOnly: true, ok: has("$19") },
           { name: "facts stored for later re-checks", ok: (_r, { store }) => (store.db.prepare("SELECT COUNT(*) AS n FROM claims").get() as { n: number }).n >= 3 },
@@ -175,7 +185,7 @@ export const SCENARIOS: Scenario[] = [
         at: "2026-11-09T11:00:00+05:30",
         session: "a",
         say: "We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing.",
-        checks: [intent("search"), { name: "one search per CRM + the speculative one (6, in parallel)", ok: (r) => r.searches === 6 }, noUnsupportedPrices],
+        checks: [intent("search"), { name: "planned round: one search per CRM + the speculative one (6, in parallel)", ok: (r) => r.searches === 6 }, noSelfSearchWhenCovered, selfSearchesBounded, noUnsupportedPrices],
       },
       {
         at: "2026-11-12T15:00:00+05:30",
@@ -443,7 +453,9 @@ export const SCENARIOS: Scenario[] = [
         say: "Compare Linear and Basecamp pricing for our 8-person team.",
         checks: [
           intent("search"),
-          { name: "one search per product + the question", ok: (r) => r.searches === 3 },
+          { name: "planned round: one search per product + the question", ok: (r) => r.searches === 3 },
+          noSelfSearchWhenCovered,
+          selfSearchesBounded,
           { name: "per-seat price times the team: 8 x $16 = $128", offlineOnly: true, ok: has("$128") },
           { name: "flat price is not multiplied by seats", offlineOnly: true, ok: (r) => r.text.includes("$299") && !r.text.includes("$2,392") },
           noUnsupportedPrices,
@@ -557,10 +569,11 @@ export async function runScenario(
     }
     if (step.openNewChat) {
       const n = await agent.nudge(sid);
-      result = { text: n?.nudge.text ?? "", sources: [], warnings: [], searches: searchCount, firstTokenMs: null, totalMs: 0, nudge: n?.nudge.text ?? null, unverified: [] };
+      result = { text: n?.nudge.text ?? "", sources: [], warnings: [], searches: searchCount, selfSearches: 0, firstTokenMs: null, totalMs: 0, nudge: n?.nudge.text ?? null, unverified: [] };
     } else {
       result = await collect(agent.chat(sid, step.say!));
-      result.searches = searchCount;
+      // The provider counts every search; the loop's own are reported apart from the planned round.
+      result.searches = searchCount - (result.selfSearches ?? 0);
     }
     await agent.idle();
     reports.push({
@@ -587,7 +600,7 @@ function safe(f: () => boolean): boolean {
 }
 
 async function collect(events: AsyncGenerator<AgentEvent>): Promise<TurnResult> {
-  const r: TurnResult = { text: "", sources: [], warnings: [], searches: 0, firstTokenMs: null, totalMs: 0, unverified: [] };
+  const r: TurnResult = { text: "", sources: [], warnings: [], searches: 0, selfSearches: 0, firstTokenMs: null, totalMs: 0, unverified: [] };
   for await (const ev of events) {
     if (ev.type === "delta") r.text += ev.text;
     else if (ev.type === "turn") r.userMessageId = ev.userMessageId;
@@ -605,6 +618,8 @@ async function collect(events: AsyncGenerator<AgentEvent>): Promise<TurnResult> 
       r.firstTokenMs = ev.timings.firstTokenMs;
       r.firstModelTokenMs = ev.timings.firstModelTokenMs;
       r.totalMs = ev.timings.totalMs;
+      r.selfSearches = ev.loop.selfSearches;
+      r.covered = ev.loop.covered;
     }
   }
   return r;

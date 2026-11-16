@@ -58,31 +58,122 @@ test("the speculative search is cancelled when the router says no search is need
   assert.equal(store.searchesFor(store.sessionMessages(sid)[0]!.id).length, 0);
 });
 
-test("bounded agent loop: when prefetched sources fall short, the answer model searches itself and cites it", async () => {
-  const clock = new FakeClock("2026-11-10T10:00:00+05:30");
+/** The agent's one search provider; it finds nothing until `open` (the planned round runs before that). */
+function lateWorld(clock: FakeClock, missing: (q: string) => boolean = () => true) {
   const world = new FakeSearch(clock);
-  const empty: SearchProvider = { name: "empty", search: async () => [] }; // the planner's prefetch finds nothing
-  const { store, agent } = make(new FakeLLM(world), empty, clock);
+  const state = { open: false, log: [] as string[] };
+  const search: SearchProvider = {
+    name: "late",
+    search: (q, o) => (state.log.push(q), !state.open && missing(q) ? Promise.resolve([]) : world.search(q, o)),
+  };
+  return { search, state };
+}
+
+/** Opens the world when the answer model is first called: everything it searches finds pages. */
+function openOnAnswer(llm: LLM, state: { open: boolean }): LLM {
+  const base = llm.streamAnswer.bind(llm);
+  llm.streamAnswer = (input: AnswerInput) => ((state.open = true), base(input));
+  return llm;
+}
+
+test("agent loop: when the planned round finds nothing, the model searches itself; the pages are sources, cited and grounded", async () => {
+  const clock = new FakeClock("2026-11-10T10:00:00+05:30");
+  const { search, state } = lateWorld(clock);
+  const { store, agent } = make(openOnAnswer(new FakeLLM(search), state), search, clock);
   const sid = agent.newSession().id;
   const { events, text } = await run(agent, sid, "What does Neon Postgres cost?");
-  assert.ok(events.some((e) => e.type === "status" && e.text.startsWith("Searching the web:")));
+  assert.ok(events.some((e) => e.type === "status" && e.text.startsWith("Searching again:")));
   const sources = events.filter((e) => e.type === "sources").at(-1);
-  assert.ok(sources?.type === "sources" && sources.sources.some((s) => s.domain === "neon.com"));
-  assert.match(text, /Neon: the Launch plan costs \$19 per month \[\d\]/);
+  const neon = sources?.type === "sources" ? sources.sources.find((s) => s.domain === "neon.com") : undefined;
+  assert.ok(neon, "the follow-up page is a source");
+  assert.match(text, new RegExp(`Neon: the Launch plan costs \\$19 per month \\[${neon.n}\\]`));
   assert.ok(!events.some((e) => e.type === "warning"), "self-found prices count as evidence");
+  assert.ok(events.some((e) => e.type === "search" && e.state === "done"), "the follow-up search reports its end like a planned one");
   assert.ok(store.searchesFor(store.sessionMessages(sid)[0]!.id).some((s) => s.purpose === "self-search"));
 });
 
-test("the loop is off for small talk and recall", async () => {
+test("agent loop: a product the planned round missed is searched again (1 tool call), cited and grounded", async () => {
+  const clock = new FakeClock("2026-11-10T10:00:00+05:30");
+  const { search, state } = lateWorld(clock, (q) => /supabase/i.test(q));
   const seen: number[] = [];
+  const llm = openOnAnswer(new FakeLLM(search), state);
+  const base = llm.streamAnswer.bind(llm);
+  const budgets: number[] = [];
+  llm.streamAnswer = (input: AnswerInput) => (seen.push(input.rounds.length), budgets.push(input.maxSelfSearches), base(input));
+  const { store, agent } = make(llm, search, clock);
+  const sid = agent.newSession().id;
+  const { events, text } = await run(agent, sid, "Compare Neon and Supabase pricing");
+  assert.equal(budgets[0], 3, "a product without a priced source: the full budget");
+  const done = events.find((e) => e.type === "done");
+  assert.deepEqual(done?.type === "done" && done.loop, { selfSearches: 1, covered: false });
+  assert.deepEqual(seen, [0, 1], "two model calls: one tool round, then the answer");
+  const last = events.filter((e) => e.type === "sources").at(-1);
+  const supa = last?.type === "sources" ? last.sources.find((s) => s.domain === "supabase.com") : undefined;
+  assert.ok(supa, "the follow-up page is a source");
+  assert.match(text, new RegExp(`Supabase: [^\\n]*\\$\\d+[^\\n]*\\[${supa.n}\\]`));
+  assert.ok(!events.some((e) => e.type === "warning"));
+  const self = store.searchesFor(store.sessionMessages(sid)[0]!.id).filter((s) => s.purpose === "self-search");
+  assert.deepEqual(self.map((s) => s.query), ["Supabase pricing"]);
+});
+
+test("agent loop is bounded: a model that always wants more gets at most ANSWER_MAX_SEARCHES searches, then must answer", async () => {
+  const clock = new FakeClock("2026-11-10T10:00:00+05:30");
+  const world = new FakeSearch(clock);
+  const budgets: number[] = [];
+  let call = 0;
+  const greedy = new FakeLLM();
+  greedy.streamAnswer = async function* (input: AnswerInput): AsyncIterable<AnswerEvent> {
+    budgets.push(input.maxSelfSearches);
+    if (input.maxSelfSearches > 0) {
+      // Two calls per round, whatever the budget says.
+      yield { type: "tool_call", id: `c${call++}`, query: "Neon pricing" };
+      yield { type: "tool_call", id: `c${call++}`, query: "Railway pricing" };
+      return;
+    }
+    const found = input.rounds.flatMap((r) => r.results.flatMap((x) => x.sources));
+    const refused = input.rounds.flatMap((r) => r.results.filter((x) => x.error));
+    yield { type: "text", text: `Done after ${input.rounds.length} rounds; ${found.length} pages; ${refused.length} refused.` };
+  };
+  const store = new Store(":memory:");
+  const agent = new Agent({ store, llm: greedy, search: world, clock, timezone: "Asia/Kolkata", maxSelfSearches: 3 });
+  const sid = agent.newSession().id;
+  const { text } = await run(agent, sid, "What does Supabase cost?");
+  assert.deepEqual(budgets, [3, 1, 0], "the budget shrinks each round and the last call has no tool");
+  const self = store.searchesFor(store.sessionMessages(sid)[0]!.id).filter((s) => s.purpose === "self-search");
+  assert.equal(self.length, 3, "2 + 1 searches ran");
+  assert.match(text, /Done after 2 rounds; \d+ pages; 1 refused/, "the 4th call got a 'budget used up' result");
+});
+
+test("agent loop stops searching when the spend cap is reached", async () => {
+  const clock = new FakeClock("2026-11-10T10:00:00+05:30");
   const llm = new FakeLLM();
+  llm.streamAnswer = async function* (input: AnswerInput): AsyncIterable<AnswerEvent> {
+    if (input.maxSelfSearches > 0) yield { type: "tool_call", id: "c1", query: "Neon pricing" };
+    else yield { type: "text", text: "answer" };
+  };
+  const store = new Store(":memory:");
+  const meter = { check: () => { throw new Error("Spend cap reached"); } };
+  const agent = new Agent({ store, llm, search: new FakeSearch(clock), clock, timezone: "Asia/Kolkata", meter });
+  const sid = agent.newSession().id;
+  const { text } = await run(agent, sid, "What does Supabase cost?");
+  assert.match(text, /spend cap is reached/);
+  assert.equal(store.searchesFor(store.sessionMessages(sid)[0]!.id).filter((s) => s.purpose === "self-search").length, 0);
+});
+
+test("the loop is off for small talk, recall and arithmetic: zero searches", async () => {
+  const seen: number[] = [];
+  const clock = new FakeClock("2026-11-10T10:00:00+05:30");
+  const world = new FakeSearch(clock);
+  const llm = new FakeLLM(world);
   const base = llm.streamAnswer.bind(llm);
   llm.streamAnswer = (input: AnswerInput) => (seen.push(input.maxSelfSearches), base(input));
-  const { agent } = make(llm, { name: "none", search: async () => [] });
+  const { agent } = make(llm, world, clock);
   const sid = agent.newSession().id;
   await run(agent, sid, "hi");
   await run(agent, sid, "What did I ask you yesterday?");
-  assert.deepEqual(seen, [0, 0]);
+  await run(agent, sid, "What is 17 * 23?");
+  assert.deepEqual(seen, [0, 0, 0]);
+  assert.deepEqual(world.log, [], "no search of any kind");
 });
 
 test("a stale price copied from an old answer is flagged", async () => {
