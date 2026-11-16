@@ -308,7 +308,12 @@ export const SCENARIOS: Scenario[] = [
         checks: [
           intent("recall"),
           { name: "today is the IST day: the 00:20 question", ok: has("Is Bun stable enough for production?") },
-          { name: "not the 23:40 question (same UTC day, previous IST day)", ok: (r) => !r.text.includes("pnpm") },
+          {
+            // The 23:40 question belongs to the previous IST day: it must not be quoted or dated as today's.
+            // Mentioning it as "last night" is correct context, so only a quote or a "17 Nov, 23:40" date fails.
+            name: "not the 23:40 question (same UTC day, previous IST day)",
+            ok: (r) => !r.text.includes("How should I structure a monorepo with pnpm workspaces") && !/17 Nov,?\s*23:40/.test(r.text),
+          },
         ],
       },
       {
