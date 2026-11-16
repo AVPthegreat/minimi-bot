@@ -137,7 +137,8 @@ export function createConversation({ log, composer }) {
           case "warning": bot.warn(ev.text); break;
           case "error": {
             agentFailed = true;
-            const err = new ApiError("agent", ev.message);
+            const err = new ApiError("agent", ev.message, 0, ev.code || "");
+            if (ev.code) { bot.fail(ev.message, null); break; } // a hosted-demo limit: say it plainly, no retry
             bot.fail(`The answer stopped early: ${ev.message}${/spend cap/i.test(ev.message) ? SPEND_HINT : ""}`, err.retryable ? () => send(text) : null);
             break;
           }

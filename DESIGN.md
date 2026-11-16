@@ -71,6 +71,13 @@ app-panel items (site · date, bold title, grey quote line), one orange accent; 
 Text tokens pass WCAG AA on their surfaces (ratios in `public/css/tokens.css`); the window turns solid under
 `prefers-reduced-transparency`. The Report page (`/report`) draws `public/report/data.json`, built by `npm run report`.
 
+**Hosted demo** (`DEMO_MODE=1`, `src/app.ts` + `src/demo/`; off = the single-user app, same routes). Each route asks
+`ctx(req)` for the caller's agent: a random 128-bit visitor id in an HMAC-signed HttpOnly cookie maps to that visitor's
+own SQLite file, clock and Agent (opened lazily, LRU of 200, swept after `DEMO_TTL_DAYS`). One `LedgerMeter` (same
+prices as `usage.ts`) writes every call's cost to `demo.db` and refuses paid calls at `DEMO_BUDGET_USD`; chat then sends
+a typed `demo_budget` event. Per-visitor daily cap, per-IP token bucket, 1 answer per visitor / 8 globally, 2,000-char
+messages, CSP and frame-ancestors none. Runbook: `deploy/README-demo.md`. Rejected: one shared memory (privacy), accounts (friction).
+
 **Eval.** `eval/scenarios.ts` replays multi-day conversations on a fake clock against a fixture web whose prices
 change on known dates: the three example questions, nudges, time phrases (late night IST, "the 3rd", "yesterday
 evening"), same-day recall, small talk vs. a new question, rupees, contradicting sources, team totals, prompt
@@ -79,3 +86,5 @@ independently of the guard; honest "(unverified)" prices are counted apart. Plus
 
 **With another week:** read full official pages and require two sources for high-stakes numbers; a macOS background
 scheduler for nudges; embeddings for paraphrased recall; a nightly live eval graded by a judge model.
+
+Detail: [docs/HLD.md](docs/HLD.md) (architecture, security, cost, scaling) and [docs/LLD.md](docs/LLD.md) (algorithms, schema, events).

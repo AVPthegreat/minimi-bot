@@ -15,7 +15,8 @@
     "eval": "node --disable-warning=ExperimentalWarning --import tsx eval/run.ts",
     "eval:live": "EVAL_LIVE=1 node --disable-warning=ExperimentalWarning --import tsx eval/run.ts",
     "report": "node --disable-warning=ExperimentalWarning --import tsx eval/report.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "demo:budget": "node --disable-warning=ExperimentalWarning --import tsx src/demo/budget-cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.3.0",
