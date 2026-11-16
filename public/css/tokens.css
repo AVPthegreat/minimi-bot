@@ -44,8 +44,8 @@
 
   /* Accent: minimi orange. Orange fills carry black text; small orange text uses the darker ink. */
   --orange: #ff8133;
-  --orange-ink: #b34700;                  /* 5.2:1 on white */
-  --orange-display: #d9590b;              /* 3.6:1 on white: large display text only */
+  --orange-ink: #b34700;                  /* 5.5:1 on white */
+  --orange-display: #d9590b;              /* 3.9:1 on white: large display text only */
   --orange-soft: #fff3ea;
   --orange-line: #ffd2b3;
 
@@ -58,7 +58,7 @@
   /* Status */
   --ok: #0f6a3f;
   --ok-soft: #e7f6ee;
-  --warn: #8f3b00;                        /* amber ink on its soft fill: 7.4:1 */
+  --warn: #8f3b00;                        /* amber ink on its soft fill: 6.8:1 */
   --warn-soft: #fff1e0;
   --warn-line: #f8cf9d;
   --bad: #a3171b;
