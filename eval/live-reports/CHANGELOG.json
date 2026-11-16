@@ -1,13 +1,19 @@
 {
-  "about": "What each live run (npm run eval:live, real Claude models and Claude web search, 16 Nov 2026) taught us, and the commits that fixed it before the next run. Hand-written from the commit messages; npm run report checks every commit exists.",
+  "about": "What each live run (npm run eval:live, real Claude models and Claude web search, 16 Nov 2026) taught us, and the commits that fixed it before the next run. Hand-written from the commit messages; npm run report checks every commit exists. \"targeted\" lists the only scenarios a cheap re-run (EVAL_ONLY) ran: such a run is shown apart and never compared with a full-suite run.",
   "runs": [
     {
       "run": 1,
       "title": "Baseline: the 15 Nov build against the real models",
       "learned": "The router missed its 1.5 s cap, so the search plan collapsed to one query and Opus searched on its own for 15 to 35 s. Some prices reached the answer with no gathered source behind them.",
       "fixes": [
-        { "commit": "1ffffbb", "what": "Planner and grounding guard: the subjects of a comparison are read in code; a streaming guard marks any price no source backs" },
-        { "commit": "24fda11", "what": "The agent owns the search plan: one search per subject starts before routing, all in parallel; the answer model writes only from gathered sources; date readings and quoted questions rendered by code" }
+        {
+          "commit": "1ffffbb",
+          "what": "Planner and grounding guard: the subjects of a comparison are read in code; a streaming guard marks any price no source backs"
+        },
+        {
+          "commit": "24fda11",
+          "what": "The agent owns the search plan: one search per subject starts before routing, all in parallel; the answer model writes only from gathered sources; date readings and quoted questions rendered by code"
+        }
       ]
     },
     {
@@ -15,7 +21,10 @@
       "title": "Agent-owned plan and the grounding guard",
       "learned": "Search snippets dropped the quoted price bullets, the price reader missed '$50,' and past-tense old prices, unverified prices were not re-checked, and the nudge could announce the same change twice.",
       "fixes": [
-        { "commit": "4c52127", "what": "Snippets keep the search model's quoted price bullets; price reader handles '$50,', plurals and past-tense prices; unverified prices are re-checked; the nudge re-checks every fact of a subject with no repeat searches" }
+        {
+          "commit": "4c52127",
+          "what": "Snippets keep the search model's quoted price bullets; price reader handles '$50,', plurals and past-tense prices; unverified prices are re-checked; the nudge re-checks every fact of a subject with no repeat searches"
+        }
       ]
     },
     {
@@ -23,14 +32,38 @@
       "title": "Snippet and price-reader fixes",
       "learned": "3 checks left, all 'every price is backed by a source': the guard could not tie some prices to the source that backed them (Supabase's $25 in the re-check) and counted the 20-seat team totals ($280, $400, $1,600) as unsourced.",
       "fixes": [
-        { "commit": "3ae6315", "what": "Routing: a message with its own question is answered as that question; small talk has nothing to re-check" },
-        { "commit": "b283328", "what": "Grounding precision: a price belongs to the product named in its clause; a price backed by the source it cites passes; sourced unit price x the user's team size passes; 'Changed' means the value changed" },
-        { "commit": "44eade6", "what": "Eval: the grounding check runs independently of the guard; honestly flagged '(unverified)' prices are counted apart" },
-        { "commit": "70edca1", "what": "Time phrases: parts of a day ('yesterday evening', 'last night' past midnight) and 'on the 3rd'" },
-        { "commit": "bbdfe4d", "what": "Arithmetic and definitions answered without search; web text is data: injected instructions ignored, tag-like text defanged" },
-        { "commit": "70e4b8a", "what": "Typed search-step events in the stream for the live search steps in the UI" },
-        { "commit": "70592e4", "what": "Site logos fetched server-side: public hosts only, sniffed images, size and time caps, letter-tile fallback" },
-        { "commit": "5f0e38d", "what": "Eval widened from 48 to 131 offline checks: late-night IST, same-day recall, small talk, no-search questions, rupees, contradicting sources, team totals, prompt injection, nothing-changed watchlist" }
+        {
+          "commit": "3ae6315",
+          "what": "Routing: a message with its own question is answered as that question; small talk has nothing to re-check"
+        },
+        {
+          "commit": "b283328",
+          "what": "Grounding precision: a price belongs to the product named in its clause; a price backed by the source it cites passes; sourced unit price x the user's team size passes; 'Changed' means the value changed"
+        },
+        {
+          "commit": "44eade6",
+          "what": "Eval: the grounding check runs independently of the guard; honestly flagged '(unverified)' prices are counted apart"
+        },
+        {
+          "commit": "70edca1",
+          "what": "Time phrases: parts of a day ('yesterday evening', 'last night' past midnight) and 'on the 3rd'"
+        },
+        {
+          "commit": "bbdfe4d",
+          "what": "Arithmetic and definitions answered without search; web text is data: injected instructions ignored, tag-like text defanged"
+        },
+        {
+          "commit": "70e4b8a",
+          "what": "Typed search-step events in the stream for the live search steps in the UI"
+        },
+        {
+          "commit": "70592e4",
+          "what": "Site logos fetched server-side: public hosts only, sniffed images, size and time caps, letter-tile fallback"
+        },
+        {
+          "commit": "5f0e38d",
+          "what": "Eval widened from 48 to 131 offline checks: late-night IST, same-day recall, small talk, no-search questions, rupees, contradicting sources, team totals, prompt injection, nothing-changed watchlist"
+        }
       ]
     },
     {
@@ -38,8 +71,44 @@
       "title": "Widened suite: 12 scenarios",
       "learned": "One miss, and it was the check, not the agent: naming the 23:40 question as last night's context is correct, but the check failed on any mention of it.",
       "fixes": [
-        { "commit": "9aef87d", "what": "Eval: the late-night 'today' check fails only if the 23:40 question is quoted or dated as today" }
+        {
+          "commit": "9aef87d",
+          "what": "Eval: the late-night 'today' check fails only if the 23:40 question is quoted or dated as today"
+        }
       ]
+    },
+    {
+      "run": 5,
+      "title": "Full suite on the first agent-loop version",
+      "learned": "After the planned round the answer model could search on its own, and it added follow-up searches even when every product already had a priced source. The 3 misses were all search-count checks, and a comparison's first text rose to 30 to 36 s.",
+      "fixes": [
+        {
+          "commit": "cad74ea",
+          "what": "Agent loop: the model gets a coverage note and searches again only for a real gap (one follow-up at most when every subject is covered)"
+        },
+        {
+          "commit": "bb41acf",
+          "what": "Eval: the planned round and the model's own searches are counted apart; loop checks; EVAL_ONLY runs a chosen subset"
+        }
+      ]
+    },
+    {
+      "run": 6,
+      "title": "Targeted re-run of the three scenarios that missed",
+      "targeted": [
+        "postgres-last-tuesday",
+        "crm-shortlist-monday",
+        "grounding-formats"
+      ],
+      "learned": "Only these 3 scenarios ran (EVAL_ONLY), to check the coverage-guided loop cheaply: 33/33, web-search first text p50 14.7 s, and the model searched on its own only where a gap existed. A subset, so it is not compared with full-suite runs.",
+      "fixes": []
+    },
+    {
+      "run": 7,
+      "title": "Full suite on the final code",
+      "finalCode": true,
+      "learned": "The submitted code (same src as main). One miss: an 'Anything new?' answer made up an illustrative example amount ($12) that no source backed. The grounding guard marked it '(unverified)' in the answer; the stricter eval check (no price shown as fact without a source) still counted it as a miss.",
+      "fixes": []
     }
   ]
 }

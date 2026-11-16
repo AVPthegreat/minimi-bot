@@ -26,8 +26,10 @@ try {
 }
 
 function render(d) {
-  const latest = d.runs.at(-1);
-  $("window-meta").textContent = `${d.totals.liveRuns} live runs · real Claude models and web search · ${ist(latest.at)} latest`;
+  // The headline is the latest FULL run (data.json `latest`); a targeted re-run of a few scenarios never stands in for it.
+  const latest = d.runs.find((r) => r.run === d.latest.run) ?? d.runs.at(-1);
+  const targeted = d.runs.filter((r) => r.targeted).length;
+  $("window-meta").textContent = `${d.totals.liveRuns} live runs${targeted ? ` (${d.totals.liveRuns - targeted} full, ${targeted} targeted)` : ""} · real Claude models and web search · headline: run ${latest.run}${latest.finalCode ? " on the final code" : ""}, ${ist(latest.at)}`;
 
   const stat = (icon, value, label, note) =>
     h("div", { class: "stat" },
@@ -37,7 +39,7 @@ function render(d) {
       h("p", { class: "stat-note" }, note));
   const off = d.offline;
   $("hero-stats").replaceChildren(
-    stat("globe", [String(latest.passed), h("small", {}, ` / ${latest.total}`)], { kind: `Live run ${latest.run}`, text: "live checks passed" }, `${latest.scenarios.length} multi-day scenarios`),
+    stat("globe", [String(latest.passed), h("small", {}, ` / ${latest.total}`)], { kind: `Live run ${latest.run}${latest.finalCode ? " · final code" : ""}`, text: latest.finalCode ? "live checks passed on the final code" : "live checks passed" }, `${latest.scenarios.length} multi-day scenarios, full suite`),
     stat("verify", [String(off.eval.passed), h("small", {}, ` / ${off.eval.passed + off.eval.failed}`)], { kind: "Offline eval", text: "eval checks passed" }, "fake clock + fixture web, no keys"),
     stat("check", [String(off.unitTests.passed)], { kind: "npm test", text: `of ${off.unitTests.total} tests pass` }, "unit tests, no network"),
     stat("scale", [usd(d.totals.spendUsd)], { kind: "Total spend", text: "for all live runs" }, `${d.totals.calls} model calls, ${d.totals.webSearches} web searches`),
@@ -46,7 +48,7 @@ function render(d) {
   $("same-suite").replaceChildren(
     "On the same ", String(s.scenarios), " scenarios, run ", String(s.before.run), " passed ",
     h("strong", {}, `${s.before.passed}/${s.before.total}`), "; run ", String(s.after.run), " passed ",
-    h("strong", {}, `${s.after.passed}/${s.after.total}`), ".",
+    h("strong", {}, `${s.after.passed}/${s.after.total}`), " (later runs added checks to these scenarios).",
   );
 
   drawChart(d.runs);
@@ -75,22 +77,26 @@ function drawChart(runs) {
     svg.append(el("text", { x: L - 8, y: y(p) + 4, "text-anchor": "end", class: "axis-text" }, `${p}%`));
   }
   const pts = runs.map((r, i) => [x(i), y(pct(r.passed, r.total))]);
-  svg.append(el("path", { class: "area", d: `M${pts.map((p) => p.join(" ")).join("L")}L${pts.at(-1)[0]} ${y(50)}L${pts[0][0]} ${y(50)}Z` }));
-  svg.append(el("path", { class: "line", d: `M${pts.map((p) => p.join(" ")).join("L")}` }));
+  // The line joins full-suite runs only; a targeted re-run (a few scenarios) is a separate dashed point off the line.
+  const full = pts.filter((_, i) => !runs[i].targeted);
+  const lastFull = runs.map((r) => !r.targeted).lastIndexOf(true);
+  svg.append(el("path", { class: "area", d: `M${full.map((p) => p.join(" ")).join("L")}L${full.at(-1)[0]} ${y(50)}L${full[0][0]} ${y(50)}Z` }));
+  svg.append(el("path", { class: "line", d: `M${full.map((p) => p.join(" ")).join("L")}` }));
   const wrap = $("chart");
   const tip = h("div", { class: "tip", role: "tooltip", hidden: true });
   runs.forEach((r, i) => {
     const [px, py] = pts[i];
-    const last = i === runs.length - 1;
+    const last = i === lastFull;
     svg.append(el("text", { x: px, y: H - 26, "text-anchor": "middle", class: "run-text" }, `Run ${r.run}`));
-    svg.append(el("text", { x: px, y: H - 10, "text-anchor": "middle", class: "axis-text" }, `${r.scenarios.length} scenarios`));
-    const hit = el("circle", { cx: px, cy: py, r: 18, class: "hit", tabindex: 0, "aria-label": `Run ${r.run}: ${r.passed} of ${r.total} live checks passed (${pct(r.passed, r.total)}%), ${usd(r.spendUsd)}` });
-    svg.append(hit, el("circle", { cx: px, cy: py, r: 6, class: `pt${last ? " last" : ""}` }));
-    const anchor = i === 0 ? "start" : last ? "end" : "middle";
-    const lx = i === 0 ? px - 4 : last ? px + 4 : px;
+    svg.append(el("text", { x: px, y: H - 10, "text-anchor": "middle", class: "axis-text" }, r.targeted ? `targeted · ${r.scenarios.length}` : `${r.scenarios.length} scenarios`));
+    const hit = el("circle", { cx: px, cy: py, r: 18, class: "hit", tabindex: 0, "aria-label": `Run ${r.run}${r.targeted ? " (targeted re-run, not the full suite)" : ""}: ${r.passed} of ${r.total} live checks passed (${pct(r.passed, r.total)}%), ${usd(r.spendUsd)}` });
+    svg.append(hit, el("circle", { cx: px, cy: py, r: 6, class: `pt${last ? " last" : ""}${r.targeted ? " targeted" : ""}` }));
+    const edge = i === runs.length - 1;
+    const anchor = i === 0 ? "start" : edge ? "end" : "middle";
+    const lx = i === 0 ? px - 4 : edge ? px + 4 : px;
     svg.append(el("text", { x: lx, y: py - 14, "text-anchor": anchor, class: "pt-label" }, `${r.passed}/${r.total}`));
     const show = () => {
-      tip.replaceChildren(h("strong", {}, `Run ${r.run} · ${pct(r.passed, r.total)}%`), `${r.passed} of ${r.total} live checks, ${r.scenarios.length} scenarios, ${usd(r.spendUsd)} spent, ${r.webSearches} web searches. ${ist(r.at)}.`);
+      tip.replaceChildren(h("strong", {}, `Run ${r.run}${r.targeted ? " · targeted" : ""} · ${pct(r.passed, r.total)}%`), `${r.targeted ? "Only the scenarios that missed, not the full suite. " : ""}${r.passed} of ${r.total} live checks, ${r.scenarios.length} scenarios, ${usd(r.spendUsd)} spent, ${r.webSearches} web searches. ${ist(r.at)}.`);
       const box = svg.getBoundingClientRect();
       const scale = box.width / W;
       tip.style.left = `${Math.min(Math.max(px * scale, 110), box.width - 110)}px`;
@@ -118,7 +124,7 @@ function table(id, caption, head, rows) {
 function runsTable(runs) {
   table("runs-table", "Live runs, 16 Nov 2026", [["Run"], ["Time"], ["Passed", 1], ["Failed", 1], ["Total", 1], ["Pass rate", 1], ["Spend", 1], ["Model calls", 1], ["Web searches", 1]],
     runs.map((r) => h("tr", {},
-      h("th", { scope: "row" }, `Run ${r.run}`), h("td", {}, ist(r.at)),
+      h("th", { scope: "row" }, `Run ${r.run}${r.targeted ? " (targeted)" : r.finalCode ? " (final code)" : ""}`), h("td", {}, ist(r.at)),
       h("td", { class: "num" }, r.passed), h("td", { class: "num" }, r.failed), h("td", { class: "num" }, r.total),
       h("td", { class: "num" }, `${pct(r.passed, r.total)}%`), h("td", { class: "num" }, usd(r.spendUsd)),
       h("td", { class: "num" }, r.calls ?? "–"), h("td", { class: "num" }, r.webSearches ?? "–"))));
@@ -131,9 +137,9 @@ function runList(runs) {
       : [h("li", { class: "ok" }, "Nothing failed.")];
     const fixes = r.fixes.length
       ? r.fixes.map((f) => h("li", {}, h("a", { class: "sha", href: `${REPO}/commit/${f.commit}`, rel: "noopener noreferrer" }, f.commit), f.what))
-      : [h("li", {}, "No changes needed.")];
+      : [h("li", {}, r.run === runs.at(-1).run ? "No code change after this run." : "No changes needed.")];
     return h("li", {},
-      h("p", { class: "run-meta" }, h("span", { class: "run-num" }, r.run), h("span", {}, ist(r.at)), h("span", {}, "·"), h("span", {}, `${usd(r.spendUsd)} · ${r.webSearches} web searches`), h("span", { class: "score" }, `${r.passed}/${r.total} passed`)),
+      h("p", { class: "run-meta" }, h("span", { class: "run-num" }, r.run), h("span", {}, ist(r.at)), h("span", {}, "·"), h("span", {}, `${usd(r.spendUsd)} · ${r.webSearches} web searches`), r.targeted ? h("span", { class: "chip-pill" }, `Targeted: ${r.scenarios.length} scenarios`) : null, r.finalCode ? h("span", { class: "chip-pill all" }, "Final code") : null, h("span", { class: "score" }, `${r.passed}/${r.total} passed`)),
       h("p", { class: "run-title" }, r.title ?? `Run ${r.run}`),
       r.learned ? h("p", { class: "run-learned" }, r.learned) : null,
       h("div", { class: "run-cols" },

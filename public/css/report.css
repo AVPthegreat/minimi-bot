@@ -76,6 +76,7 @@ code { font-family: var(--mono); font-size: 0.88em; padding: 1px 6px; border-rad
 .chart .area { fill: var(--orange); opacity: 0.12; }
 .chart .pt { fill: var(--card); stroke: var(--text); stroke-width: 2; }
 .chart .pt.last { fill: var(--orange); stroke: var(--orange); }
+.chart .pt.targeted { stroke-dasharray: 3 2; stroke: var(--text-3); }
 .chart .pt-label { fill: var(--text); font-size: 13px; font-weight: 650; font-family: var(--font); font-variant-numeric: tabular-nums; }
 .chart .pt-sub { fill: var(--text-3); font-size: 11.5px; font-family: var(--font); }
 .chart .hit { fill: transparent; cursor: default; outline: none; }

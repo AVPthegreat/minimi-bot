@@ -29,6 +29,8 @@ export interface TurnResult {
   firstModelTokenMs?: number | null;
   totalMs: number;
   nudge?: string | null;
+  /** The right-moment score of the announced change (importance x magnitude x timeliness), when a nudge was shown. */
+  nudgeScore?: number | null;
   userMessageId?: number;
   /** Prices the grounding guard could not match and showed as "(unverified)": honest, reported, not failures. */
   unverified: string[];
@@ -251,6 +253,42 @@ export const SCENARIOS: Scenario[] = [
         ],
       },
       { at: "2026-11-16T09:30:00+05:30", session: "d", openNewChat: true, checks: [{ name: "same change is not announced twice, no searches", ok: (r) => r.nudge === null && r.searches === 0 }] },
+    ],
+  },
+  // The threshold (0.15) from both sides, on the same Neon drop ($19 -> $15 on 14 Nov, a full-size change):
+  // importance 0.55 (asked once, compared with two others) x magnitude 1 x timeliness 0.5^(days/14).
+  // 25 days after the question: 0.55 x 0.290 = 0.160, just above, so it speaks and says why now.
+  // 27 days after: 0.55 x 0.263 = 0.144, just below, so it re-checks and stays silent.
+  {
+    name: "right-moment-just-above",
+    about: "A change scoring just above the 0.15 threshold (25 days after the question) gets one nudge that says why now.",
+    steps: [
+      { at: "2026-11-10T10:00:00+05:30", session: "a", say: "What does Postgres hosting cost on Supabase, Neon and Railway?", checks: [] },
+      {
+        at: "2026-12-05T10:00:00+05:30",
+        session: "b",
+        openNewChat: true,
+        checks: [
+          {
+            name: "score just above 0.15: nudges, and says why now",
+            offlineOnly: true,
+            ok: (r) => typeof r.nudgeScore === "number" && r.nudgeScore >= 0.15 && r.nudgeScore < 0.17 && !!r.nudge && r.nudge.includes("You compared Neon with Supabase and Railway on Tue 10 Nov") && r.nudge.includes("$15"),
+          },
+        ],
+      },
+    ],
+  },
+  {
+    name: "right-moment-just-below",
+    about: "The same change scoring just below the 0.15 threshold (27 days after the question) is re-checked but not announced.",
+    steps: [
+      { at: "2026-11-10T10:00:00+05:30", session: "a", say: "What does Postgres hosting cost on Supabase, Neon and Railway?", checks: [] },
+      {
+        at: "2026-12-07T10:00:00+05:30",
+        session: "b",
+        openNewChat: true,
+        checks: [{ name: "score just below 0.15: re-checked, stays silent", offlineOnly: true, ok: (r) => r.searches > 0 && r.nudge === null }],
+      },
     ],
   },
   {
@@ -569,7 +607,7 @@ export async function runScenario(
     }
     if (step.openNewChat) {
       const n = await agent.nudge(sid);
-      result = { text: n?.nudge.text ?? "", sources: [], warnings: [], searches: searchCount, selfSearches: 0, firstTokenMs: null, totalMs: 0, nudge: n?.nudge.text ?? null, unverified: [] };
+      result = { text: n?.nudge.text ?? "", sources: [], warnings: [], searches: searchCount, selfSearches: 0, firstTokenMs: null, totalMs: 0, nudge: n?.nudge.text ?? null, nudgeScore: n?.nudge.score?.score ?? null, unverified: [] };
     } else {
       result = await collect(agent.chat(sid, step.say!));
       // The provider counts every search; the loop's own are reported apart from the planned round.

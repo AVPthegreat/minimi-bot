@@ -49,7 +49,7 @@ function loadReportNumbers() {
     .then((d) => {
       const live = d?.latest, unit = d?.offline?.unitTests;
       const parts = [];
-      if (Number.isFinite(live?.passed) && Number.isFinite(live?.total)) parts.push(`${live.passed}/${live.total} live checks`);
+      if (Number.isFinite(live?.passed) && Number.isFinite(live?.total)) parts.push(`${live.passed}/${live.total} live${live.finalCode ? " on the final code" : " checks"}`);
       if (Number.isFinite(unit?.total)) parts.push(`${unit.total} tests`);
       return parts.length ? [...parts, "architecture"].join(" · ") : null;
     })

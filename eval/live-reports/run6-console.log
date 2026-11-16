@@ -1,0 +1,80 @@
+
+> minimi-agent@1.0.0 eval:live
+> EVAL_LIVE=1 node --disable-warning=ExperimentalWarning --import tsx eval/run.ts
+
+
+## postgres-last-tuesday
+Ask about Postgres hosting on Tue 10 Nov; on Wed 18 Nov ask whether pricing changed since 'last Tuesday'.
+  1. "What does Postgres hosting cost on Supabase, Neon and Railway?" -> search | 4 planned searches | first status 23 ms, first text 14090 ms, first model token 14090 ms, total 22149 ms
+     ok intent is search
+     ok planned round: one search per product + the speculative one, in parallel
+     ok agent loop: no self-search when every product has a priced source
+     ok agent loop: self-searches <= ANSWER_MAX_SEARCHES (3)
+     ok cites at least 3 sources
+     -  states Neon's price (skipped live)
+     ok facts stored for later re-checks
+     ok no price shown as fact without a source
+  2. "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?" -> verify | 6 planned searches | first status 3 ms, first text 3 ms, first model token 17791 ms, total 23297 ms
+     ok intent is verify
+     ok routed by rules (no router model call)
+     ok reads 'last Tuesday' as Tue 10 Nov, says so
+     ok quotes the earlier question
+     ok shows a then/now table
+     -  table: Neon: Launch plan -> Changed (skipped live)
+     -  table: Supabase: Pro plan -> Unchanged (skipped live)
+     -  new Neon price $15 with a source (skipped live)
+     -  the recap keeps every product, Railway too (skipped live)
+     -  a source's headline is quoted and attributed, not said as ours (skipped live)
+     ok no price shown as fact without a source
+
+## crm-shortlist-monday
+Shortlist 5 CRMs on Mon 9 Nov; on Thu 12 Nov ask if any changed pricing or shipped something big since Monday.
+  1. "We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing." -> search | 6 planned searches | first status 1 ms, first text 18629 ms, first model token 18629 ms, total 29383 ms
+     ok intent is search
+     ok planned round: one search per CRM + the speculative one (6, in parallel)
+     ok agent loop: no self-search when every product has a priced source
+     ok agent loop: self-searches <= ANSWER_MAX_SEARCHES (3)
+     ok no price shown as fact without a source
+  2. "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?" -> verify | 10 planned searches + 3 by the model | first status 2 ms, first text 1 ms, first model token 57011 ms, total 59794 ms
+     ok intent is verify
+     ok finds Monday's conversation
+     ok re-checks all 5 tools
+     -  table: Pipedrive: Advanced plan -> Changed (skipped live)
+     -  table: HubSpot: Sales Hub Starter plan -> Unchanged (skipped live)
+     -  reports the HubSpot launch since Monday (skipped live)
+     ok no price shown as fact without a source
+     ~  shown as unverified (honest, not a failure): $80
+
+## grounding-formats
+Prices in rupees, a free tier, sources that contradict each other, and per-seat vs flat pricing for a team.
+  1. "How much does Zoho Books cost in India?" -> search | 2 planned searches | first status 1 ms, first text 14726 ms, first model token 14726 ms, total 21180 ms
+     ok intent is search
+     ok gives prices in rupees
+     -  states the Standard plan's ₹749 with a citation (skipped live)
+     -  no dollar price invented for an INR question (skipped live)
+     ok no price shown as fact without a source
+     ~  shown as unverified (honest, not a failure): ₹884
+  2. "Does Render have a free tier for Postgres, and what does the cheapest paid Render Postgres plan cost?" -> search | 1 planned searches | first status 0 ms, first text 11466 ms, first model token 11466 ms, total 15716 ms
+     ok intent is search
+     ok answers the free-tier part
+     -  gives both sources' prices ($6 and $7) (skipped live)
+     -  says the sources disagree (skipped live)
+     ok no price shown as fact without a source
+     ~  shown as unverified (honest, not a failure): $9
+  3. "Compare Linear and Basecamp pricing for our 8-person team." -> search | 3 planned searches | first status 0 ms, first text 15725 ms, first model token 15725 ms, total 24137 ms
+     ok intent is search
+     ok planned round: one search per product + the question
+     ok agent loop: no self-search when every product has a priced source
+     ok agent loop: self-searches <= ANSWER_MAX_SEARCHES (3)
+     -  per-seat price times the team: 8 x $16 = $128 (skipped live)
+     -  flat price is not multiplied by seats (skipped live)
+     ok no price shown as fact without a source
+
+33 passed, 0 failed (live, search: anthropic)
+Prices the guard could not source and showed as "(unverified)": 3 in 3 answers
+Median first text per intent:
+  search     5 turns | first text p50 14.7 s | planned searches/turn 3.2 | self-searches/turn 0.0
+  verify     2 turns | first text p50   1 ms | planned searches/turn 8.0 | self-searches/turn 1.5
+Spend: $0.7673 over 55 calls, 35 web searches (claude-haiku-5-5: 542940 in / 59472 out / 0 cache-read; claude-opus-5-5: 23929 in / 11293 out / 10479 cache-read)
+Results: /home/faurus/dev/minimi-agent/eval/results/live-2026-11-16T13-29-27-587Z.json and .md
+EXIT 0

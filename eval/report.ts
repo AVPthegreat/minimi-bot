@@ -78,7 +78,7 @@ const files = readdirSync(LIVE);
 const runNums = [...new Set(files.map((f) => f.match(/^run(\d+)-/)?.[1]).filter(Boolean).map(Number))].sort((a, b) => a - b);
 if (!runNums.length) throw new Error(`No runN-*.json files in ${LIVE}`);
 const changelog = JSON.parse(readFileSync(join(LIVE, "CHANGELOG.json"), "utf8")) as {
-  runs: { run: number; title: string; learned: string; fixes: { commit: string; what: string }[] }[];
+  runs: { run: number; title: string; learned: string; targeted?: string[]; finalCode?: boolean; fixes: { commit: string; what: string }[] }[];
 };
 
 const runs = runNums.map((n) => {
@@ -95,11 +95,20 @@ const runs = runNums.map((n) => {
   }
   const usage = data.spend.match(/over (\d+) calls, (\d+) web searches/);
   const notes = changelog.runs.find((r) => r.run === n);
+  // A targeted run (EVAL_ONLY) ran only some scenarios: its log must hold exactly those, and it is kept out of
+  // every full-suite comparison (headline, same-suite, latency) so a subset never reads as a full score.
+  const targeted = notes?.targeted ?? null;
+  if (targeted) {
+    const ran = scenarios.map((s) => s.name).sort().join(",");
+    if (ran !== [...targeted].sort().join(",")) throw new Error(`run ${n}: CHANGELOG.json says targeted ${targeted.join(", ")} but the log ran ${ran}`);
+  }
   for (const f of notes?.fixes ?? []) if (!commitExists(f.commit)) console.warn(`warning: CHANGELOG.json run ${n} names commit ${f.commit}, which is not in this repository`);
   return {
     run: n,
     at: data.at,
     mode: data.mode,
+    targeted: Boolean(targeted),
+    finalCode: Boolean(notes?.finalCode),
     models: data.models,
     passed: data.checks.passed,
     failed: data.checks.failed,
@@ -119,8 +128,10 @@ const runs = runNums.map((n) => {
   };
 });
 
-const first = runs[0]!;
-const latest = runs.at(-1)!;
+const fullRuns = runs.filter((r) => !r.targeted);
+if (!fullRuns.length) throw new Error("No full-suite live run (every run is targeted)");
+const first = fullRuns[0]!;
+const latest = fullRuns.at(-1)!; // the headline: the latest FULL run, never a targeted subset
 
 // The same suite before and after: the latest run, counted only on the first run's scenarios.
 const firstNames = new Set(first.scenarios.map((s) => s.name));
@@ -176,7 +187,7 @@ const data = {
     calls: runs.reduce((s, r) => s + (r.calls ?? 0), 0),
     webSearches: runs.reduce((s, r) => s + (r.webSearches ?? 0), 0),
   },
-  latest: { run: latest.run, passed: latest.passed, total: latest.total, scenarios: latest.scenarios.length },
+  latest: { run: latest.run, passed: latest.passed, total: latest.total, scenarios: latest.scenarios.length, finalCode: latest.finalCode, at: latest.at },
   sameSuite,
   offline,
   latency,
@@ -185,7 +196,8 @@ const data = {
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, JSON.stringify(data, null, 2) + "\n");
 console.log(`Wrote ${OUT.replace(ROOT, "")}`);
-for (const r of runs) console.log(`  run ${r.run}: ${r.passed}/${r.total} live checks, $${r.spendUsd.toFixed(2)}, ${r.calls} calls, ${r.webSearches} web searches`);
+for (const r of runs) console.log(`  run ${r.run}${r.targeted ? " (targeted)" : ""}: ${r.passed}/${r.total} live checks, $${r.spendUsd.toFixed(2)}, ${r.calls} calls, ${r.webSearches} web searches`);
+console.log(`  headline: run ${latest.run}${latest.finalCode ? " (final code)" : ""}, ${latest.passed}/${latest.total}`);
 console.log(`  same ${sameSuite.scenarios} scenarios: ${sameSuite.before.passed}/${sameSuite.before.total} -> ${sameSuite.after.passed}/${sameSuite.after.total}`);
 const o = offline as ReturnType<typeof runOffline>;
 console.log(`  offline: ${o.eval.passed}/${o.eval.passed + o.eval.failed} eval checks, ${o.unitTests.passed}/${o.unitTests.total} unit tests`);

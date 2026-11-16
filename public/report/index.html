@@ -58,8 +58,8 @@
     <div id="load-error" class="wrap" hidden></div>
 
     <section id="scores" class="wrap block" aria-labelledby="scores-title">
-      <h2 id="scores-title">Score across the four live runs</h2>
-      <p class="block-sub">Each live run replays the same multi-day conversations against the real models (Claude Opus for answers, Claude Haiku for routing, search and reading values) and real web search. After each run we fixed what failed and ran again. Run 4 added 7 new scenarios, so it has more checks.</p>
+      <h2 id="scores-title">Score across the seven live runs</h2>
+      <p class="block-sub">Each live run replays the same multi-day conversations against the real models (Claude Opus for answers, Claude Haiku for routing, search and reading values) and real web search. After each run we fixed what failed and ran again. Run 4 added 7 new scenarios, so it has more checks. Run 6 was a targeted re-run of only the 3 scenarios run 5 missed (dashed point, off the line); run 7 is the full suite on the final code.</p>
       <figure class="chart-card">
         <div id="chart" class="chart"></div>
         <figcaption class="chart-caption">Share of live checks passed per run. Hover or focus a point for the details.</figcaption>
@@ -77,14 +77,14 @@
     </section>
 
     <section class="wrap block" aria-labelledby="scen-title">
-      <h2 id="scen-title">Latest live run, scenario by scenario</h2>
+      <h2 id="scen-title">Latest full live run, scenario by scenario</h2>
       <p class="block-sub">Checks that need the offline test web's fixed prices (for example "states Neon's price") are skipped in live runs and counted separately; the offline eval runs them all.</p>
       <div class="table-scroll card-table"><table id="scenario-table" class="data-table"></table></div>
     </section>
 
     <section class="wrap block" aria-labelledby="lat-title">
       <h2 id="lat-title">How fast it answers</h2>
-      <p class="block-sub" id="lat-sub">Medians from the latest live run, by question type.</p>
+      <p class="block-sub" id="lat-sub">Medians from the latest full live run, by question type.</p>
       <div class="table-scroll card-table"><table id="latency-table" class="data-table"></table></div>
       <p class="fine">"First text" is the first words on screen. For re-checks and memory questions, code writes the date reading ("Last Tuesday = Tue 10 Nov") and the quoted earlier question at once, before the model answers; "first model token" is when the model's own words start. Search answers wait for the parallel web searches.</p>
     </section>
