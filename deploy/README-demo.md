@@ -36,7 +36,7 @@ the "answers running" counters live in that process (the ledger itself is in SQL
 | `DEMO_IP_REQUESTS_PER_MIN` | 240 | All requests per IP |
 | `DEMO_MAX_MESSAGE_CHARS` | 2000 | Longer messages are refused |
 | `DEMO_MAX_BODY_BYTES` | 16384 | Request body cap |
-| `DEMO_MAX_STREAMS` | 8 | Answers (and nudges) running at once, server-wide; 1 per visitor |
+| `DEMO_MAX_STREAMS` | 8 | Answers (and nudges) running at once, server-wide; 1 answer per visitor (their message cancels a running nudge) |
 | `DEMO_STREAM_TIMEOUT_MS` | 120000 | An answer is stopped (and saved) after this |
 | `DEMO_TRUST_PROXY` | off | `1` = use the last `X-Forwarded-For` entry and `X-Forwarded-Proto` (only behind your proxy) |
 | `DEMO_COOKIE_SECURE` | off | `1` = always mark cookies Secure (they already are when the trusted proxy says https) |
