@@ -15,28 +15,36 @@ becomes a precise lookup plus a re-check of exactly those facts, with a then/now
    "two weeks ago". No AI here: it's instant, testable, and can't hallucinate a date.
 3. **Route** (`src/router.ts`): cheap rules first ("hi", "what did I ask", "still correct?", "anything new?"), and only
    if the rules aren't sure, a small fast model (Haiku) decides: chat, recall, verify, or search, and writes the search
-   queries. If that model is slow (4 s) or fails, a fallback still answers.
+   queries. Meanwhile code has already started the searches: the question itself plus, for a comparison, one search
+   per product it names ("Supabase, Neon and Railway" = 3 searches). If the router says "no search", they are cancelled.
 4. **Gather evidence**:
    - chat: nothing;
    - recall: look up the earlier conversation in memory (time window + keyword search);
-   - search: run 1-5 queries **in parallel**, rank official and recent pages first (`src/search/rank.ts`);
+   - search: one query per product, **in parallel** (`src/planner.ts`), rank official and recent pages first and keep
+     every product's best page (`src/search/rank.ts`);
    - verify: find the earlier answer, load its stored facts ("claims"), search for exactly those facts in parallel,
      have the small model read the current values, and **compare in code** (`src/recheck.ts`, `src/claims.ts`).
-5. **Stream the answer** from the big model (Opus), citing sources as [1], [2] with dates.
-6. **Price guard**: every price in the answer must appear in the sources; if not, the UI shows a warning.
-7. **Save**, then in the background extract the answer's facts into the claims table for future re-checks.
+5. **Show progress at once**: "Searching the web for Supabase, Neon, Railway (4 searches in parallel)", then a line
+   per finished search. For memory questions, code writes "Last Tuesday = Tue 10 Nov" and quotes your earlier
+   question before anything else.
+6. **Stream the answer** from the big model (Opus), written only from the gathered sources, citing [1], [2] with dates.
+7. **Grounding guard** (`src/grounding.ts`): while the answer streams, each sentence or table row with a price is
+   checked against the sources before you see it; a price no source supports is shown as "$X (unverified)".
+8. **Save**, then in the background extract the answer's facts into the claims table, filed under the products
+   that were searched, for future re-checks.
 
 ## Every important decision, in plain words
 
-- **Is it a real agent or a pipeline?** Both, on purpose. The predictable steps (route, search, recall, re-check)
-  run as a fast parallel pipeline. The answer model also gets the web_search tool with a budget of 3 searches, so
-  when the planned searches missed, it can look again itself. A free-running loop on every turn would be slow and
-  hard to test; a pure pipeline gets stuck when the plan is wrong.
+- **Is it a real agent or a pipeline?** Both, on purpose. The agent owns the plan: route, one search per product,
+  recall, re-check run as a fast parallel pipeline. Only when those searches find nothing does the answer model get
+  the web_search tool itself (max 3). A free-running loop on every turn was slow (live: 15-35 s before the first
+  word) and its prices weren't tied to sources we control.
 - **Doesn't routing slow things down?** When the rules can't decide, the agent starts searching for the raw
   question immediately, while the router thinks. If the router says "no search", that search is cancelled; if the
   router is slow (over 1.5 s), the agent answers from the speculative search.
-- **What if there's only an Anthropic key?** Search uses Anthropic's web_search tool, and all planned queries go
-  into ONE small-model call (not one call per query).
+- **What if there's only an Anthropic key?** Search uses Anthropic's web_search tool: one small Haiku call per
+  query, each allowed exactly one search, all in parallel. (We first batched all queries into one call; the model
+  then ran whatever searches it liked, one after another.)
 - **Why route instead of always searching?** Most messages that mention the past don't need the web, and "hi"
   shouldn't cost a search. Routing makes those instant and free. The obvious cases are caught by rules with no model
   call at all.
@@ -62,7 +70,8 @@ becomes a precise lookup plus a re-check of exactly those facts, with a then/now
   values) in a fraction of a second at very low cost. The big one (Opus 5.5) writes what the user reads.
 - **Which search provider and why?** Behind an interface (`src/search/types.ts`). Tavily is the default when its key
   exists: one fast HTTP call returns clean snippets and dates. Otherwise it uses Anthropic's own server-side
-  `web_search` tool, which needs only the Anthropic key but costs a model call per query (slower). Swapping
+  `web_search` tool, which needs only the Anthropic key but costs a small model call per query (slower, run in
+  parallel). Swapping
   providers is one file.
 - **Why the "right moment" nudge?** That's minimi's product idea: speak up only when it matters. On a new chat the
   agent quietly re-checks a few old facts (bounded: max 3 searches, skipped if checked recently). If something
@@ -72,17 +81,41 @@ becomes a precise lookup plus a re-check of exactly those facts, with a then/now
 - **Safety and cost:** spend cap (`MAX_SPEND_USD`), input size limits, the server listens on localhost only, FTS
   queries are quoted so user text can't inject search syntax, keys only in `.env`.
 
+## What the first live run taught us (16 Nov: 26 of 36 checks passed; fixed since)
+
+The offline tests passed 48/48, but the fakes were kinder than the real models. Five real gaps, and the fix for each:
+1. **Searches didn't fan out.** The small router model took longer than its 1.5 s budget, so the plan fell back to
+   "search the question once", and Opus then searched on its own. Fix: code reads the products from the question and
+   searches each one itself; the answer model writes only from those results.
+2. **Slow first word (16-37 s).** Because Opus was searching before writing. Fix: a progress line at once, one line
+   per finished search, then Opus streams straight away (no tool).
+3. **"Last Tuesday" not stated.** The date was right, but Opus skipped the note. Fix: code writes "Last Tuesday =
+   Tue 10 Nov" at the top.
+4. **Monday's conversation "not found".** Memory found it; Opus paraphrased it and the stored facts were capped at 12
+   (3 CRMs with 4 tiers each), named "HubSpot Sales Hub" etc. Fix: code quotes the question; facts are filed under
+   the searched product names, max 3 per product, so all 5 get re-checked.
+5. **"Anything new?" too long.** 3 subjects (bounded) but every fact of each. Fix: max 2 facts per subject, in code.
+The fakes now behave like the live models (slow router, ignores notes, paraphrases, searches when it can), and
+`test/livegaps.test.ts` has a test per gap.
+
+**Interview lines:** "Why did offline pass and live fail?" Because the fake models were too cooperative; I made the
+fakes as unhelpful as the real ones and added a test per live failure. "Where does grounding live?" In code: a
+streaming guard, not a prompt rule. "Who decides what to search?" The agent, in code; models only fill gaps.
+
 ## 10 likely interview questions
 
 1. **Walk me through what happens when I ask "Last Tuesday I asked about Postgres hosting, has pricing changed?"**
    Rules route it to verify with no model call. "Last Tuesday" becomes two candidate days; memory finds the
    conversation on one of them; its stored facts (e.g. Neon Launch $19) are re-searched in parallel; the small
    model reads today's values; code builds the table; Opus writes 2-4 sentences on what changed, with sources.
-2. **How do you make it fast?** Rules skip the router for common cases; searches run in parallel; the answer streams;
+2. **How do you make it fast?** Rules skip the router for common cases; searches start before routing and run in
+   parallel; a progress line shows at once; the answer streams;
    claim extraction happens after the answer; the verify table shows before the model starts; small talk and
    recall never search.
-3. **How do you stop it inventing prices?** Prompt rule plus a check: every price in the answer is matched against
-   the sources and memory; unmatched ones are flagged. Tables come from code.
+3. **How do you stop it inventing prices?** In code, not just the prompt: the answer model only sees the sources the
+   agent gathered, and a guard checks every price line before it is shown; an unmatched price appears as
+   "(unverified)" and is never saved as a fact. Totals are allowed only as sourced price x your number. Tables come
+   from code.
 4. **What if search is down?** Each query fails independently; if all fail, the user is told the answer isn't
    backed by fresh sources, and the model is told not to state current facts.
 5. **Why not just put the whole chat history in the context?** It grows forever, costs more every turn, and the model
