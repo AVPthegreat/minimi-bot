@@ -85,7 +85,9 @@ flowchart LR
 - **Web UI:** plain ES modules and CSS, no build step, light and dark, works at 360 px. Site logos come through the
   server's own logo proxy, so the browser never calls a third party.
 
-More in [DESIGN.md](DESIGN.md) (one page) and [EXPLAIN.md](EXPLAIN.md). HLD and LLD documents are coming in PR #3.
+More in [DESIGN.md](DESIGN.md) (one page), the [High-Level Design](docs/HLD.md) (requirements, components, request
+lifecycles, security, cost, scaling, trade-offs), the [Low-Level Design](docs/LLD.md) (module by module: algorithms,
+schema, stream events, errors, configuration, test map) and [EXPLAIN.md](EXPLAIN.md).
 
 ## Testing
 

@@ -86,3 +86,5 @@ independently of the guard; honest "(unverified)" prices are counted apart. Plus
 
 **With another week:** read full official pages and require two sources for high-stakes numbers; a macOS background
 scheduler for nudges; embeddings for paraphrased recall; a nightly live eval graded by a judge model.
+
+Detail: [docs/HLD.md](docs/HLD.md) (architecture, security, cost, scaling) and [docs/LLD.md](docs/LLD.md) (algorithms, schema, events).

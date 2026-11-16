@@ -261,11 +261,11 @@ sequenceDiagram
   participant M as Answer model
   B->>A: Last Tuesday I asked about Postgres hosting. Has pricing changed?
   A->>T: parseTimeRefs
-  T-->>A: candidates Tue 10 Nov
+  T-->>A: candidates Tue 17 Nov, then Tue 10 Nov
   A->>A: rulesRoute gives verify, no model call
   A->>Mem: recall with refs and topic
   Mem->>D: userMessagesBetween, searchUserMessages FTS5
-  Mem-->>A: past turn, its answer and claims
+  Mem-->>A: the day with a matching question, its answer and claims
   A-->>B: delta Last Tuesday = Tue 10 Nov, plus the quoted question
   A->>A: dedupeClaims, at most 12
   A-->>B: status Re-checking N facts about K subjects
