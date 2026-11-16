@@ -166,7 +166,7 @@
             <li><strong>Route and plan.</strong> Rules handle the clear cases; a small model routes the rest within 1.5 s. Code reads the subjects of a comparison and starts one search per subject before routing finishes.</li>
             <li><strong>Search in parallel.</strong> One web search per subject, all at once; official and recent pages rank first.</li>
             <li><strong>Ground the answer.</strong> The answer model writes only from the gathered sources. While it streams, a guard holds each sentence with a price until it can match it to a source, or marks it "(unverified)".</li>
-            <li><strong>Remember and watch.</strong> Checkable facts (product, plan, price, source, date) are saved as rows. A new chat quietly re-checks facts older than 3 days and speaks up with one line only if something changed.</li>
+            <li><strong>Remember and watch.</strong> Checkable facts (product, plan, price, source, date) are saved as rows. A new chat quietly re-checks facts older than 3 days and speaks up with one line only when a change scores high enough (importance × size of the change × timeliness), saying why now.</li>
           </ol>
         </figcaption>
       </figure>
