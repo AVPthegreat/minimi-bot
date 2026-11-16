@@ -109,7 +109,8 @@ flowchart TB
     DM["createDemoApp<br/>cookie, limits, CSP"]
   end
   subgraph CORE["Agent core"]
-    A["Agent.chat / Agent.nudge<br/>src/agent.ts"]
+    A["Agent.chat lifecycle / Agent.nudge<br/>src/agent.ts"]
+    H["routeTurn, HANDLERS per intent, answer loop<br/>src/turn/*"]
     TP["parseTimeRefs<br/>src/timeparse.ts"]
     RT["rulesRoute, route<br/>src/router.ts"]
     PL["planSubjects, subjectQueries<br/>src/planner.ts"]
@@ -127,6 +128,7 @@ flowchart TB
     ST["Store<br/>src/db.ts"]
   end
   R --> A
+  A --> H
   SU --> R
   DM --> R
   A --> TP
@@ -152,7 +154,8 @@ flowchart TB
 |---|---|---|
 | HTTP app | `src/app.ts` `createApp`, `route`, `handler` | Static files, JSON API, SSE chat stream, Origin and content-type checks, typed `HttpError`. One fork point: `Mode.ctx(req)` returns the caller's agent. |
 | Hosted demo | `src/app.ts` `createDemoApp`, `src/demo/*` | Per-visitor agent and SQLite file, signed cookie, budget ledger, rate limits, security headers, TTL sweep. |
-| Agent | `src/agent.ts` `Agent.chat`, `Agent.nudge` | Orchestrates one turn as an async generator of `AgentEvent`. Owns the search plan. |
+| Agent | `src/agent.ts` `Agent.chat`, `Agent.nudge` | The shared turn lifecycle as an async generator of `AgentEvent`: store, route, dispatch to the intent's handler, answer, persist. Owns the search plan. |
+| Turn stages | `src/turn/route.ts` `routeTurn`; `src/turn/handlers/*` (`HANDLERS`: chat, recall, verify, updates, search); `src/turn/answer.ts` `answer` | Routing with the planned round; one evidence handler per intent; the bounded agent loop (the answer model's own `web_search`) behind the grounding guard. State in one `Turn` object. |
 | Time | `src/time.ts`, `src/timeparse.ts` | Injectable clock; civil dates in the user's zone; time-phrase resolution to candidate ranges. |
 | Router | `src/router.ts` `rulesRoute`, `route`, `ownQuestion`, `fallbackRoute` | Rules first; small model only when rules are unsure; fallback on timeout. |
 | Planner | `src/planner.ts` `planSubjects`, `subjectQueries`, `canonicalSubject`, `fairCap` | Reads the products of a comparison from the text; one query per product; files claims under the searched names. |
@@ -171,7 +174,8 @@ flowchart TB
 
 ## 6. Request lifecycle per intent
 
-Every turn starts the same way in `Agent.chat` (`src/agent.ts`):
+Every turn runs the same lifecycle in `Agent.chat` (`src/agent.ts`); only step 7 differs per intent (a handler in
+`src/turn/handlers/`, picked from the `HANDLERS` table):
 
 1. Trim the text to 4,000 characters (`MAX_INPUT`). Save the user message with `clock.now()`. Emit `turn`.
 2. `parseTimeRefs(text, now, tz)` returns time references and `rest` (the text without them).
@@ -182,9 +186,13 @@ Every turn starts the same way in `Agent.chat` (`src/agent.ts`):
 5. `route` asks the small model only when the rules are unsure, with a 1.5 s cap while speculative searches run
    (4 s otherwise). On timeout or error, `fallbackRoute` decides.
 6. If the final intent is not `search`, the speculative searches are aborted and their steps marked `cancelled`.
-7. Evidence is gathered per intent (below). Code-rendered lines (date reading, quotes, table) are emitted as
+7. The intent's handler gathers evidence (below). Code-rendered lines (date reading, quotes, table) are emitted as
    `delta` events before the model writes.
-8. `llm.streamAnswer` streams text through the `GroundingGuard`. Unsupported prices are marked and warned.
+8. The answer (`src/turn/answer.ts`) is a bounded agent loop: `llm.streamAnswer` streams text through the
+   `GroundingGuard`; on web intents the model may instead call its one tool, `web_search`. The agent runs those
+   searches (in parallel, `Searching again: ...`), adds the pages to the turn's sources and hands them back as tool
+   results; the model then answers or searches again, at most `ANSWER_MAX_SEARCHES` (default 3) searches per turn.
+   Unsupported prices are marked and warned.
 9. The assistant message is saved with meta (intent, sources, warnings, timings, aborted). A re-check is saved as
    new claim versions. For new answers, `llm.extractClaims` runs in the background.
 10. Emit `done` with timings.
@@ -244,8 +252,12 @@ Key choices:
 - With only an Anthropic key, each query is one small Haiku call with exactly one `web_search`
   (`src/search/anthropic.ts` `AnthropicWebSearch.search`, `max_uses: 1`), all in parallel.
 - `rankSources` with `coverEachQuery` keeps the best page of every query, so no product goes unsourced.
-- The answer model gets a `web_search` tool (max `ANSWER_MAX_SEARCHES`, default 3) only when the planned searches
-  returned no sources at all (`maxSelfSearches` in `Agent.chat`).
+- The planned round is round 1, not the whole plan: the answer model then has its one tool, `web_search`, for gaps
+  and follow-ups the planned sources do not cover (a bounded agent loop in `src/turn/answer.ts`). The agent runs
+  each call with the same search provider, so every page joins the turn's sources: the grounding guard checks
+  prices against it and it is cited `[n]` like the rest. Bounds: `ANSWER_MAX_SEARCHES` (default 3, max 5) searches
+  per turn, so at most 4 model calls; calls over the budget get a "budget used up" result and the last call has the
+  tool switched off; the spend cap is checked before every search round. Chat and recall get no tool.
 
 ### 6.3 Verify: "is that still correct?"
 
@@ -398,7 +410,7 @@ erDiagram
   }
 ```
 
-- Time is epoch milliseconds (UTC). Display and day boundaries use `USER_TIMEZONE` (default `Asia/Kolkata`).
+- Time is epoch milliseconds (UTC). Display and day boundaries use `USER_TIMEZONE` (default: the system's zone).
 - `messages_fts` is an FTS5 external-content index over `messages.content`, kept current by triggers.
 - A claim's history is a chain through `supersedes_id`. The head of each chain (no claim supersedes it) is the
   current belief; `Store.rootClaim` walks back to the answer the user originally saw.
@@ -407,7 +419,7 @@ erDiagram
 ## 8. Streaming protocol overview
 
 `POST /api/chat` with `{sessionId?, text}` returns `text/event-stream`. Each frame is `data: <json>\n\n`. Events
-(`AgentEvent` in `src/agent.ts`):
+(`AgentEvent` in `src/turn/types.ts`, re-exported by `src/agent.ts`):
 
 | Event | When |
 |---|---|
@@ -508,10 +520,11 @@ searches per turn (subject cap, watchlist cap of 3 subjects) and a shared search
 | Router model slow or failing | 1.5 s cap (speculative) or 4 s; then `fallbackRoute`: search unless the text is 3 words or fewer without "?". Searches already started are not lost. | `route`, `withTimeout` |
 | One search fails | Its step is `failed`; others continue; ranking uses what arrived. | `runQueries` catches per query |
 | Every search fails | `warning` event, a note tells the model not to state current facts; the guard still marks any price. | `Agent.chat` after gathering |
-| Planned searches find nothing | The answer model gets its own `web_search` (max 3) as a bounded fallback loop. | `maxSelfSearches` |
+| Planned searches find nothing or miss a product | The answer model searches itself in the bounded loop (max `ANSWER_MAX_SEARCHES`, default 3); the pages are sources like any other. | `src/turn/answer.ts` |
+| Spend cap reached mid-loop | The loop stops searching and says so; the answer is written from what was found. | `answer`, `deps.meter` |
 | Re-check model fails | Every row becomes "Couldn't verify"; the summary says so; never "nothing changed". | `recheckClaims` catch, `summarizeDiff` |
 | Answer model fails mid-stream | Partial text is kept, a line says it failed, an `error` event is sent, the turn is still saved. | `Agent.chat` catch |
-| Model refusal, length limit, pause | A short closing line is appended. Refusals use the API's server-side fallback model first. | `AnthropicLLM.streamAnswer` |
+| Model refusal, length limit | A short closing line is appended. Refusals use the API's server-side fallback model first. | `AnthropicLLM.streamAnswer` |
 | User presses Stop or closes the tab | Abort signal stops search and model; partial answer saved with `aborted: true`; no claims, no re-check saved. | `route` `/api/chat`, `Agent.chat` |
 | Spend cap reached | `BudgetExceededError` before the call; in the demo a typed `demo_budget` error with how to run locally. | `UsageMeter.check`, `LedgerMeter.check` |
 | Nudge slow | After 12 s the server aborts it: its searches and model call are cancelled and it writes nothing; the chat is never delayed; the change stays pending for the next new chat. | `/api/sessions/:id/nudge`, `Agent.nudge` |
@@ -526,7 +539,7 @@ searches per turn (subject cap, watchlist cap of 3 subjects) and a shared search
 | No agent framework; plain Anthropic SDK and `node:http` | Every prompt and step is visible, typed and testable. The turn is a readable async generator. | LangChain or similar: hidden control flow, harder to fake in tests. Express: not needed for about ten routes. |
 | SQLite via `node:sqlite` | Built into Node 22, no native build, one file per user, transactions and FTS5 for free. The problem is mostly "when", not "what is similar". | A vector DB: embeddings for a problem that is mostly time windows. Postgres: a server to run for a single-user app. |
 | Rules-first routing, small model second, speculative search in parallel | Small talk, recall and "still correct?" are matched in microseconds and need no model. A web question does not wait for the router. | Always search: slower and noisy. Router first: adds up to 4 s to every turn. |
-| Search plan owned by code | Live, the router missed its budget and the per-product fan-out silently never happened. Code reading "A, B and C" is instant and testable. | Letting the model plan or search on its own every turn: 15-35 s before the first word (live, 16 Nov). |
+| Search plan owned by code, then a bounded agent loop | Live, the router missed its budget and the per-product fan-out silently never happened. Code reading "A, B and C" is instant and testable, so round 1 is planned and parallel; the model then fills gaps with its own `web_search`, run by the agent so every page is grounded and cited. | Letting the model plan or search on its own from the start: 15-35 s before the first word (live, 16 Nov). A pure pipeline: no way to follow up on what the sources reveal. |
 | One provider call per query | The plan that runs is the agent's; queries run in parallel; every snippet is traceable to a query. | One batched model call with many searches: the model ran its own searches, one after another. |
 | Grounding enforced in code, not trusted to the model | A prompt can ask for sourced prices; only a guard makes an unsourced price impossible to show as fact. Checked per clause, per product, with totals. | Trusting citations, or a judge model after the fact (too late: the user already saw the number). |
 | Claims as rows, diff in code | Per-fact Changed / Unchanged / Couldn't verify, with the exact stored values in the table. | A model comparing two prose answers: misses changes, invents some. |
