@@ -502,17 +502,17 @@ Prices are in `src/usage.ts` `PRICES` (USD per million tokens, list prices as re
 Cache writes are priced at 1.25× input, cache reads at 0.1× input. An unknown model is priced at Opus-5 rates so
 spend is never under-counted. The answer system prompt is marked `cache_control: ephemeral`.
 
-**Measured** (four live runs, 16 Nov 2026, `public/report/data.json`):
+**Measured** (seven live runs, 16 Nov 2026, `public/report/data.json`; run 6 was a targeted re-run of 3 scenarios):
 
-| | Run 1 | Run 2 | Run 3 | Run 4 |
-|---|---:|---:|---:|---:|
-| Scenarios | 5 | 5 | 5 | 12 |
-| Spend | $1.28 | $0.95 | $0.96 | $1.53 |
-| Model calls | 43 | 81 | 80 | 138 |
-| Web searches | 56 | 49 | 49 | 70 |
+| | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 | Run 6 (targeted) | Run 7 (final code) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Scenarios | 5 | 5 | 5 | 12 | 12 | 3 | 12 |
+| Spend | $1.28 | $0.95 | $0.96 | $1.53 | $2.04 | $0.77 | $1.56 |
+| Model calls | 43 | 81 | 80 | 138 | 175 | 55 | 142 |
+| Web searches | 56 | 49 | 49 | 70 | 94 | 35 | 73 |
 
-Total: $4.72, 342 calls, 224 web searches. Derived from run 4 (not separately measured): 70 searches at $0.01 are
-$0.70, about 46% of that run's $1.53; across its 39 measured turns the spend is about $0.04 per turn, nudges included.
+Total: $9.09, 714 calls, 426 web searches. Derived from run 7 (not separately measured): 73 searches at $0.01 are
+$0.73, about 47% of that run's $1.56; across its 39 measured turns the spend is about $0.04 per turn, nudges included.
 Web search fees and Opus output tokens dominate; Haiku calls are cheap. The main levers are therefore fewer
 searches per turn (subject cap, watchlist cap of 3 subjects) and a shared search cache (Roadmap).
 
@@ -556,7 +556,7 @@ searches per turn (subject cap, watchlist cap of 3 subjects) and a shared search
 | Layer | What | Where |
 |---|---|---|
 | Unit | Time phrases (incl. timezone edges), routing rules, planner, value comparison, diff, price checker formats, guard streaming, markdown escaping, SSE parser, logo safety, cookie signing, token buckets | `test/*.test.ts` |
-| Offline eval | 12 multi-day scenarios on a `FakeClock` against `fixtures/world.json` (21 pages whose prices change on known dates), with a deterministic `FakeLLM` that copies live failure modes. 131 checks. Runs inside `npm test`. | `eval/scenarios.ts`, `test/agent.test.ts` |
+| Offline eval | 14 multi-day scenarios on a `FakeClock` against `fixtures/world.json` (21 pages whose prices change on known dates), with a deterministic `FakeLLM` that copies live failure modes. Runs inside `npm test`. | `eval/scenarios.ts`, `test/agent.test.ts` |
 | Demo integration | Real HTTP server in-process: isolation, tampered cookies, budget persistence across restarts, rate limits, caps, TTL sweep | `test/demo.test.ts` |
 | Live eval | Same scenarios with real models and web search; fixture-dependent checks skipped; spend capped by `MAX_SPEND_USD` (default $5); writes latency p50/p95 and spend | `npm run eval:live`, `eval/run.ts`, results in `eval/live-reports/` |
 | Report | Rebuilds `public/report/data.json` from the run files, cross-checks each result file against its console log, verifies the commits in `CHANGELOG.json`, reruns offline eval and tests | `npm run report`, `eval/report.ts` |
@@ -564,10 +564,10 @@ searches per turn (subject cap, watchlist cap of 3 subjects) and a shared search
 A key property is checked independently of the guard: "no price shown as fact without a source" re-reads the final
 answer text and fails on any unmarked price no source states (`eval/scenarios.ts`).
 
-**Measured:** live run 4 passed 106 of 107 checks (the miss was the check, fixed in commit `9aef87d`); on run 1's
-5 scenarios, run 4 passed 36 of 36 versus 26 of 36 in run 1. Offline: 131 of 131 eval checks. `npm test`:
-127 of 127 tests, as recorded in `data.json` by `npm run report` (which reruns them and flags a README that quotes
-another count).
+**Measured:** live run 7, the full suite on the final code, passed 112 of 113 checks (the miss: an illustrative
+$12 in an "anything new?" answer, marked "(unverified)" by the guard but still counted by the stricter eval check).
+Offline: 141 of 141 eval checks; `npm test`: 144 of 144 tests. `public/report/data.json` holds the current counts:
+`npm run report` reruns them and flags a README that quotes another count.
 
 ## 15. Scaling path
 

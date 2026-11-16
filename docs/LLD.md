@@ -798,8 +798,8 @@ No framework and no build step: `public/index.html` loads `js/main.js` as an ES 
 
 ## 8. Test map
 
-`npm test` runs `node --test test/*.test.ts` (142 tests, all passing; `npm run report` records the count in `public/report/data.json` and flags a stale README). `npm run eval` runs the same
-scenarios with a readable report (139 checks; `EVAL_ONLY=a,b` limits it to those scenarios).
+`npm test` runs `node --test test/*.test.ts` (144 tests, all passing; `npm run report` records the count in `public/report/data.json` and flags a stale README). `npm run eval` runs the same
+scenarios with a readable report (141 checks; `EVAL_ONLY=a,b` limits it to those scenarios).
 
 | File | Covers |
 |---|---|
@@ -815,4 +815,4 @@ scenarios with a readable report (139 checks; `EVAL_ONLY=a,b` limits it to those
 | `test/web.test.ts` | One rule picks the web_search version for answers and searches; Markdown escaping and safe links; citations only to listed sources; then/now table rendering; date and quote blocks and unverified chips; SSE parser edge cases; `retryable` rules; sidebar date groups and clock input in the agent's timezone |
 | `test/config.test.ts` | Time zone defaults to the system zone, `USER_TIMEZONE` overrides, unknown zones refused; `ANSWER_EFFORT`, `PORT` and the other numbers validated (no NaN) |
 | `test/demo.test.ts` | Single-user `/api/chat` refuses an empty message before creating a session; demo config refuses weak secrets; cookie signing and rotation; demo off equals the single-user app; visitor isolation; tampered cookies; ledger persistence and the typed budget event; daily cap; per-IP limits and proxy trust; length, body and header caps with no internals in errors; demo full; one answer per visitor and the global cap; access code; TTL sweep keeps busy visitors; typing cancels a running nudge (no 429, nothing written, change still reported); health and status name the real search provider; single-user mode sends the same security headers |
-| `eval/scenarios.ts` | 12 scenarios: `postgres-last-tuesday`, `crm-shortlist-monday`, `what-did-i-ask-on-3-nov`, `right-moment-nudge`, `fast-paths-and-follow-ups`, `time-phrases-late-night`, `recall-precision-same-day`, `small-talk-and-own-question`, `no-search-needed`, `grounding-formats`, `prompt-injection-in-results`, `watchlist-nothing-changed` |
+| `eval/scenarios.ts` | 14 scenarios: `postgres-last-tuesday`, `crm-shortlist-monday`, `what-did-i-ask-on-3-nov`, `right-moment-nudge`, `right-moment-just-above` and `right-moment-just-below` (the 0.15 threshold from both sides), `fast-paths-and-follow-ups`, `time-phrases-late-night`, `recall-precision-same-day`, `small-talk-and-own-question`, `no-search-needed`, `grounding-formats`, `prompt-injection-in-results`, `watchlist-nothing-changed` |

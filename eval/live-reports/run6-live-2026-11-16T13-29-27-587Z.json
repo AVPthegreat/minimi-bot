@@ -1,0 +1,834 @@
+{
+  "mode": "live",
+  "at": "2026-11-16T13:29:27.587Z",
+  "models": {
+    "answer": "claude-opus-5-5",
+    "fast": "claude-haiku-5-5",
+    "search": "anthropic",
+    "searchModel": "claude-haiku-5-5"
+  },
+  "checks": {
+    "passed": 33,
+    "failed": 0
+  },
+  "unverifiedPrices": {
+    "count": 3,
+    "answers": 3
+  },
+  "spendUsd": 0.7673,
+  "spend": "$0.7673 over 55 calls, 35 web searches (claude-haiku-5-5: 542940 in / 59472 out / 0 cache-read; claude-opus-5-5: 23929 in / 11293 out / 10479 cache-read)",
+  "latency": [
+    {
+      "intent": "search",
+      "turns": 5,
+      "firstStatusP50": 1,
+      "firstModelTokenP50": 14726,
+      "firstModelTokenP95": 18629,
+      "firstTokenP50": 14726,
+      "firstTokenP95": 18629,
+      "totalP50": 22149,
+      "totalP95": 29383,
+      "searchesAvg": 3.2,
+      "selfSearchesAvg": 0
+    },
+    {
+      "intent": "verify",
+      "turns": 2,
+      "firstStatusP50": 2,
+      "firstModelTokenP50": 17791,
+      "firstModelTokenP95": 57011,
+      "firstTokenP50": 1,
+      "firstTokenP95": 3,
+      "totalP50": 23297,
+      "totalP95": 59794,
+      "searchesAvg": 8,
+      "selfSearchesAvg": 1.5
+    }
+  ],
+  "steps": [
+    {
+      "scenario": "postgres-last-tuesday",
+      "step": 1,
+      "say": "What does Postgres hosting cost on Supabase, Neon and Railway?",
+      "intent": "search",
+      "firstStatusMs": 23,
+      "firstTokenMs": 14090,
+      "firstModelTokenMs": 14090,
+      "totalMs": 22149,
+      "searches": 4,
+      "selfSearches": 0,
+      "covered": true,
+      "failedChecks": [],
+      "warnings": [],
+      "unverified": [],
+      "text": "For a small Postgres database, expect about **$5/month on Railway, about $15/month on Neon and $25/month on Supabase**. All three also have a $0 free tier. None of the pages below shows a date, so check the prices on each provider's own pricing page before you commit.\n\n| | Free | Entry paid plan | Higher tier |\n|---|---|---|---|\n| **Supabase** | $0 [4] | Pro: $25/month [4][6] | Team: $599/month (adds SOC 2 and SSO) [4][8]; Enterprise: custom [4] |\n| **Neon** | $0 [1] | Launch: usage-based, typical spend $15/month [1] | Scale: usage-based, typical spend $701/month [1] |\n| **Railway** | $0/month with $1 of monthly usage credits [2] | Hobby: $5/month including $5 of usage credits [2] | Pro: $20/month per workspace including $20 of credits [2]; Enterprise: custom [3] |\n\n**How the usage-based prices work**\n- **Supabase:** The $25 Pro plan covers your first project, and each extra project starts at $10 [6]. Above 100,000 monthly active users, you pay $0.00325 per extra user [4].\n- **Neon:** You pay for compute by the hour. It costs $0.106 per CU-hour on Launch and $0.222 per CU-hour on Scale [1]. Storage on Launch is $0.35/GB-month [5]. That storage price comes from a single third-party blog, not from Neon.\n- **Railway:** The plan fee comes with credits, and resource use beyond the credits is billed. RAM is $10/GB/month, CPU is $20/vCPU/month and network egress is $0.05/GB [3]. New users get a 30-day trial with a $5 one-time credit [2].\n\n**How reliable these numbers are**\n- The Neon and Railway prices come from their official pricing pages [1][2][3].\n- The Supabase prices come only from third-party sites [4][6][8], because I didn't find Supabase's own pricing page. Two sources agree on each Supabase number, but confirm them at supabase.com/pricing.\n- A spending-data site reports that Railway's \"SMB plans\" average $370 [7]. That's probably what larger teams actually spend, not a list price, so I left it out of the table.\n\n**Which is cheapest:** Railway Hobby at $5 [2] works well if you want your app and database on one bill [6]. Neon Launch has no monthly minimum and comes to around $15 for a small database [6]. Supabase Pro has a fixed $25 fee [4] but includes more than a database: it also handles user accounts, which is where the per-user charges come from.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Neon Pricing: Free Plan With 100 Projects, Typical Spend $15/Month",
+          "url": "https://neon.com/pricing",
+          "domain": "neon.com",
+          "official": true,
+          "quote": "\"Free plan: $0\" \"Launch Usage-based Typical spend: $15 /mo\" \"Scale Usage-based Typical spend: $701 /mo\" \"Launch: $0.106 per CU-hour\" \"Scale: $0.222 per CU-hour\""
+        },
+        {
+          "n": 2,
+          "title": "--- title: Railway Pricing",
+          "url": "https://railway.com/pricing.md",
+          "domain": "railway.com",
+          "official": true,
+          "quote": "\"Hobby — $5/month, including $5 of monthly usage credits.\" \"Pro — $20/month per workspace, including $20 of monthly usage credits.\" \"Free — $0/month with $1…"
+        },
+        {
+          "n": 3,
+          "title": "Pricing Plans",
+          "url": "https://docs.railway.com/pricing/plans",
+          "domain": "docs.railway.com",
+          "official": true,
+          "quote": "\"| Enterprise | Custom |\" \"| RAM | $10 / GB / month ($0.000231 / GB / minute) |\" \"| CPU | $20 / vCPU / month ($0.000463 / vCPU / minute) |\" \"| Network…"
+        },
+        {
+          "n": 4,
+          "title": "Supabase Pricing: 2026 Guide to Plans, Limits, and Real-World Costs",
+          "url": "https://www.jetadmin.io/blog/supabase-pricing-2026-guide-to-plans-limits-and-real-world-costs/",
+          "domain": "jetadmin.io",
+          "official": false,
+          "quote": "\"Supabase offers four pricing plans - Free ($0), Pro ($25/month), Team ($599/month), and Enterprise (custom pricing)\" \"Supabase charges $0.00325 per…"
+        },
+        {
+          "n": 5,
+          "title": "Neon Pricing 2026: Plans, Costs & Limits",
+          "url": "https://www.jetadmin.io/blog/neon-pricing/",
+          "domain": "jetadmin.io",
+          "official": false,
+          "quote": "\"Launch: $0.35/GB-month\""
+        },
+        {
+          "n": 6,
+          "title": "PostgreSQL and SQLite hosting: free and paid options",
+          "url": "https://flaviocopes.com/database-hosting-options/",
+          "domain": "flaviocopes.com",
+          "official": false,
+          "quote": "\"Pro starts at $25 a month\" for the first project, extra projects from $10 each (Supabase Pro) \"Neon Launch has no minimum and lands around $15 for a small…"
+        },
+        {
+          "n": 7,
+          "title": "Actual Railway Pricing 2026",
+          "url": "https://www.spendhound.com/marketplace/railway-pricing",
+          "domain": "spendhound.com",
+          "official": false,
+          "quote": "\"On average, **Railway is priced at $370 for SMB plans**.\""
+        },
+        {
+          "n": 8,
+          "title": "Supabase pricing: plans, free tier limits, and the bills AI is quietly creating",
+          "url": "https://www.cloudzero.com/blog/supabase-pricing/",
+          "domain": "cloudzero.com",
+          "official": false,
+          "quote": "\"Team ($599 per month, adds SOC 2 and SSO)\""
+        }
+      ]
+    },
+    {
+      "scenario": "postgres-last-tuesday",
+      "step": 2,
+      "say": "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?",
+      "intent": "verify",
+      "firstStatusMs": 3,
+      "firstTokenMs": 3,
+      "firstModelTokenMs": 17791,
+      "totalMs": 23297,
+      "searches": 6,
+      "selfSearches": 0,
+      "covered": null,
+      "failedChecks": [],
+      "warnings": [],
+      "unverified": [],
+      "text": "**Last Tuesday = Tue 10 Nov.** \"Last Tuesday\" could mean Tue 17 Nov or Tue 10 Nov. You asked about this on Tue 10 Nov, so I used that day.\n\nYou asked on Tue 10 Nov, 10:00: \"What does Postgres hosting cost on Supabase, Neon and Railway?\"\n\nNothing I checked has changed since Tue 10 Nov (9 of 9 verified).\n\n| What | Then (Tue 10 Nov) | Now (Wed 18 Nov) | Status |\n|---|---|---|---|\n| Supabase: Free tier price | $0 | $0 [12] | Unchanged |\n| Supabase: Pro plan price | $25 per month | $25 per month [12] | Unchanged |\n| Supabase: Team plan price | $599 per month | $599 per month [12] | Unchanged |\n| Neon: Free tier price | $0 | $0 [1] | Unchanged |\n| Neon: Launch plan typical monthly spend for small database | $15 per month | $15 per month [1] | Unchanged |\n| Neon: Launch plan compute price | $0.106 per CU-hour | $0.106 per CU-hour [1] | Unchanged |\n| Railway: Free plan price | $0 per month | $0 per month [2] | Unchanged |\n| Railway: Hobby plan price | $5 per month | $5 per month [2] | Unchanged |\n| Railway: Pro plan price | $20 per month per workspace | $20 per month [2] | Unchanged |\n\n**No, none of the prices I checked has changed since Tue 10 Nov.** All nine still match the numbers I gave you then. None of the pages shows a date, so I can only say they show the same prices today (Wed 18 Nov), not exactly when each was last updated.\n\n**What's better confirmed now**\n- **Neon storage:** Last time, the $0.35/GB-month Launch storage price came from a single third-party blog. Neon's own FAQ now confirms it [5]. It also confirms the $0.106 per CU-hour compute price [5].\n\n**What I still couldn't verify**\n- **Supabase:** I still didn't find Supabase's official pricing page. The numbers come from three third-party sites that agree with each other: Free at $0, Pro at $25 and Team at $599 per month [6][11][12]. Since this matters to you, confirm them at supabase.com/pricing.\n- **Railway Pro \"per workspace\":** Railway's official docs say Pro is \"$20 / month\" [2]. They don't mention \"per workspace,\" so I couldn't confirm that part.\n- **Railway's free plan:** Sources disagree. Railway's official docs list a Free plan at $0/month [2]. A third-party review site says Railway doesn't offer a free plan [9]. Neither page is dated. I'd trust Railway's own docs, but check before you count on it.\n\n**Any big news since Tue 10 Nov:** I found nothing showing a launch or a pricing change. There is a November 2026 Supabase news roundup, but what I found of it says nothing about pricing [7]. Railway's plans were last tracked by a pricing-history site on Nov 9, 2026 [4], which is the day before you asked. So that site can't show whether anything changed afterwards.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Neon Pricing: Free Plan With 100 Projects, Typical Spend $15/Month",
+          "url": "https://neon.com/pricing",
+          "domain": "neon.com",
+          "official": true,
+          "quote": "\"Launch: Usage-based Typical spend: $15 /mo\" \"Paid plans are usage-based with no monthly minimum and no per-project fee\" \"Launch plan: $0.106 per CU-hour\"…"
+        },
+        {
+          "n": 2,
+          "title": "Pricing Plans",
+          "url": "https://docs.railway.com/pricing/plans",
+          "domain": "docs.railway.com",
+          "official": true,
+          "quote": "\"The Hobby Plan is $5 a month\" \"Free | $0 / month\" \"Pro | $20 / month\""
+        },
+        {
+          "n": 3,
+          "title": "Neon’s New Pricing, Explained: Usage-Based, No Minimum - Neon",
+          "url": "https://neon.com/blog/new-usage-based-pricing",
+          "domain": "neon.com",
+          "official": true
+        },
+        {
+          "n": 4,
+          "title": "Railway pricing history: free plan, from $5/mo",
+          "url": "https://pricingsaas.com/companies/railway",
+          "domain": "pricingsaas.com",
+          "official": false,
+          "quote": "Railway current plans table: \"Checked Nov 9, 2026 UTC\""
+        },
+        {
+          "n": 5,
+          "title": "What are the limits and quotas for Neon's Free plan? - Neon FAQs",
+          "url": "https://neon.com/faqs/free-plan-limits-and-quotas",
+          "domain": "neon.com",
+          "official": true,
+          "quote": "\"The Launch plan has no monthly minimum. You pay $0.106 per CU-hour and $0.35 per GB-month\""
+        },
+        {
+          "n": 6,
+          "title": "Supabase pricing: plans, free tier limits, and the bills AI is quietly creating",
+          "url": "https://www.cloudzero.com/blog/supabase-pricing/",
+          "domain": "cloudzero.com",
+          "official": false,
+          "quote": "\"Team | $599/org/month + usage\" \"Free | $0 | 2 projects, 500 MB database each\" \"Pro ($25 per organization per month plus usage)\""
+        },
+        {
+          "n": 7,
+          "title": "Supabase News",
+          "url": "https://blog.mean.ceo/supabase-news-november-2026/",
+          "domain": "blog.mean.ceo",
+          "official": false,
+          "quote": "\"Supabase News | November, 2026\" (age: 10 days)"
+        },
+        {
+          "n": 8,
+          "title": "Neon Pricing 2026: Plans, Costs & Limits",
+          "url": "https://www.jetadmin.io/blog/neon-pricing/",
+          "domain": "jetadmin.io",
+          "official": false,
+          "quote": "\"Compute: 0.25 CU for 160 hours, 40 CU-hours × $0.106, $4.24\""
+        },
+        {
+          "n": 9,
+          "title": "Railway Pricing & Plans (November 2026)",
+          "url": "https://www.saasworthy.com/product/railway-app/pricing",
+          "domain": "saasworthy.com",
+          "official": false,
+          "quote": "\"Hobby at $5.00 per month.\" \"Pro at $20.00 per month.\" \"No, Railway does not offer a free plan.\""
+        },
+        {
+          "n": 10,
+          "title": "Supabase Review 2026: Free Tier Catch and the $599 Jump",
+          "url": "https://www.jetadmin.io/blog/supabase-review/",
+          "domain": "jetadmin.io",
+          "official": false,
+          "quote": "\"Supabase review 2026: the free tier pauses projects after a week idle, Pro's $25 includes only $10 of compute, and Team costs $599 for compliance, not…"
+        },
+        {
+          "n": 11,
+          "title": "Supabase Pricing 2026: Free vs Pro ($25) vs Team ($599)",
+          "url": "https://www.nocode.mba/articles/supabase-pricing",
+          "domain": "nocode.mba",
+          "official": false,
+          "quote": "\"Pro from $25 per organization/month\" \"Team from $599 per organization/month\" \"Free ($0)\""
+        },
+        {
+          "n": 12,
+          "title": "Supabase Pricing 2026: Free Tier, Pro Cost & Limits",
+          "url": "https://www.srvrlss.io/provider/supabase/",
+          "domain": "srvrlss.io",
+          "official": false,
+          "quote": "\"Pro starting at $25 per month, and Team starting at $599 per month\" \"Free: $0 / month\" \"Pro: From $25 / month\""
+        }
+      ]
+    },
+    {
+      "scenario": "crm-shortlist-monday",
+      "step": 1,
+      "say": "We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing.",
+      "intent": "search",
+      "firstStatusMs": 1,
+      "firstTokenMs": 18629,
+      "firstModelTokenMs": 18629,
+      "totalMs": 29383,
+      "searches": 6,
+      "selfSearches": 0,
+      "covered": true,
+      "failedChecks": [],
+      "warnings": [],
+      "unverified": [],
+      "text": "For 20 reps, **Zoho CRM and Pipedrive are the cheapest at $280/month on their entry plans**, billed annually. **Salesforce and HubSpot cost the most** once you move up to their professional tiers, at about $1,500–$1,600/month. None of the sources is dated, and most are third-party summaries, so confirm prices on each vendor's own pricing page before you buy.\n\n### Monthly cost for 20 users\n\n| CRM | Plan (per user/month) | 20-user total/month |\n|---|---|---|\n| **Zoho CRM** | Standard $14, billed annually [11] | 20 × $14 = $280 |\n| | Professional $23, billed annually [11] | 20 × $23 = $460 |\n| | Enterprise $40 [4][11] | 20 × $40 = $800 |\n| | Ultimate $52 [4][11] | 20 × $52 = $1,040 |\n| **Pipedrive** | Lite $14 billed annually / $24 billed monthly [2] | 20 × $14 = $280 / 20 × $24 = $480 |\n| | Ultimate $79 billed annually / $99 billed monthly [2] | 20 × $79 = $1,580 / 20 × $99 = $1,980 |\n| **Close** | Entry plan $19, billed monthly [12] | 20 × $19 = $380 |\n| | Second plan $49 [12] | 20 × $49 = $980 |\n| | Third plan $109 [12] | 20 × $109 = $2,180 |\n| | Top plan $149 [12] | 20 × $149 = $2,980 |\n| **HubSpot** | Starter $20/seat [6][7] | 20 × $20 = $400 |\n| | Professional, 20-person team [9] | $1,565/month ($18,780/yr) [9] |\n| **Salesforce** | Starter/Essentials $25 [3][9][10] | 20 × $25 = $500 |\n| | Professional $75 [5] or $80 [10] | 20 × $75 = $1,500 or 20 × $80 = $1,600 |\n| | Enterprise $165, billed annually [10] | 20 × $165 = $3,300 |\n\n### Things to know\n- **Salesforce Professional prices don't match:** one source says $75/user [5], another says $80/user billed annually [10]. A third gives $1,600/month for 20 users [9], which works out to the $80 figure. Neither source has a date.\n- **Free and solo plans won't work for 20 people.** Zoho's free plan is capped at 3 users [11], and Close's $9/month Solo plan is for one user [1].\n- **Pipedrive's annual billing saves up to 42%** compared with monthly billing [2]. Its add-ons cost an extra $6.67–$41/month [8].\n- **HubSpot's Professional pricing is listed per hub,** at $100–$890/month [6]. Your real cost depends on which hubs you buy, and the 20-person figure above comes from a single source [9].\n- **Close:** I only found monthly-billing prices, and the source doesn't give the plan names [12]. Check close.com/pricing for annual rates.\n\n### Only one source for these key numbers\nThese numbers each rest on one source, so double-check them:\n- all Pipedrive prices [2]\n- Close's four plan prices [12]\n- Salesforce Enterprise [10]\n- HubSpot Professional for 20 people [9]\n- Zoho Standard and Professional [11]\n\nBetter-supported numbers: Salesforce Starter at $25 (three sources), and Zoho Enterprise and Ultimate (two sources each).\n\n**Bottom line:** For a feature-rich mid-tier plan, Zoho Professional ($460) is the cheapest by a wide margin. Next are Close's $49 plan ($980) and Zoho Ultimate ($1,040). Salesforce Professional and HubSpot Professional both cost about $1,500–$1,600/month.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Close CRM Pricing & Plans",
+          "url": "https://close.com/pricing",
+          "domain": "close.com",
+          "official": true,
+          "quote": "\"Close costs $9/month for Solo (one user)\""
+        },
+        {
+          "n": 2,
+          "title": "Pipedrive Pricing 2026: Plans, Cost & What You Actually Pay",
+          "url": "https://dupple.com/pricing/pipedrive",
+          "domain": "dupple.com",
+          "official": false,
+          "quote": "\"Lite: $14/user/month (billed annually) or $24/user/month (billed monthly)\" \"Ultimate: $79/user/month (annual) or $99/user/month (monthly)\" \"Annual billing…"
+        },
+        {
+          "n": 3,
+          "title": "Salesforce Pricing: The Complete Guide for 2026 - Zeeg",
+          "url": "https://zeeg.me/en/blog/post/salesforce-pricing",
+          "domain": "zeeg.me",
+          "official": false,
+          "quote": "\"Sales Cloud Starter Suite: $25 per user per month\" \"Marketing Cloud: $1,500/org/month\" \"Slack: $6.75/user/month\""
+        },
+        {
+          "n": 4,
+          "title": "Zoho CRM Pricing: Complete Guide to Plans and Costs (2026) - Zeeg",
+          "url": "https://zeeg.me/en/blog/post/zoho-crm-pricing",
+          "domain": "zeeg.me",
+          "official": false,
+          "quote": "Zoho CRM Enterprise and Ultimate plans: \"Enterprise and Ultimate plans are $40 and $52 per user monthly respectively\" Zoho CRM Plus: \"The top-tier Plus plan…"
+        },
+        {
+          "n": 5,
+          "title": "15 CRM Software Examples 2026: Features & Pricing",
+          "url": "https://lagrowthmachine.com/crm-software-examples-2026/",
+          "domain": "lagrowthmachine.com",
+          "official": false,
+          "quote": "\"Salesforce’s advertised $75/user Professional plan\""
+        },
+        {
+          "n": 6,
+          "title": "HubSpot Pricing 2026: All Hubs, Tiers & Hidden Costs",
+          "url": "https://www.resonatehq.com/hubspot-pricing",
+          "domain": "resonatehq.com",
+          "official": false,
+          "quote": "\"Each hub comes in four tiers: Free, Starter ($20/seat/mo), Professional ($100-$890/mo), and Enterprise ($150-$3,600/mo).\" (HubSpot hub tiers, Starter…"
+        },
+        {
+          "n": 7,
+          "title": "HubSpot Pricing 2026: Every Plan, Real Costs & How to Pay Less (Updated August 2026)",
+          "url": "https://www.engagebay.com/blog/hubspot-pricing/",
+          "domain": "engagebay.com",
+          "official": false,
+          "quote": "\"Starter plans begin from $12/month, scaling to $20/seat/month\" (HubSpot Starter, from $12/month, up to $20/seat/month)"
+        },
+        {
+          "n": 8,
+          "title": "Complete Guide to Pipedrive Pricing 2026",
+          "url": "https://www.larksuite.com/en_us/blog/pipedrive-pricing",
+          "domain": "larksuite.com",
+          "official": false,
+          "quote": "\"Price ranges from $6.67-$41 per month.\" (Pipedrive add-ons)"
+        },
+        {
+          "n": 9,
+          "title": "CRM Pricing Comparison 2026 - Salesforce vs HubSpot vs Pipedrive vs Zoho vs Freshsales",
+          "url": "https://leadspark.questo.media/pages/crm-pricing-comparison-2026",
+          "domain": "leadspark.questo.media",
+          "official": false,
+          "quote": "\"Salesforce | - | $25/user/mo (Starter)\" \"20-Person Sales Team (Professional Plans)\" with \"Salesforce | Professional | $1,600/mo | $19,200/yr\" \"HubSpot |…"
+        },
+        {
+          "n": 10,
+          "title": "Salesforce Software Pricing & Plans 2026: See Your Cost",
+          "url": "https://www.vendr.com/marketplace/salesforce",
+          "domain": "vendr.com",
+          "official": false,
+          "quote": "\"Sales Cloud Essentials: $25 per user per month (billed annually)\" \"Sales Cloud Professional: $80 per user per month (billed annually)\" \"Sales Cloud…"
+        },
+        {
+          "n": 11,
+          "title": "Zoho CRM Pricing 2026: Plans, Costs & Hidden Fees",
+          "url": "https://www.elsner.com/zoho-crm-pricing-plans-guide/",
+          "domain": "elsner.com",
+          "official": false,
+          "quote": "Zoho CRM editions, annual billing: \"Free ($0, up to 3 users), Standard ($14), Professional ($23), Enterprise ($40), and Ultimate ($52)\""
+        },
+        {
+          "n": 12,
+          "title": "Close Pricing 2026: CRM Plans, Team Costs and Add-ons",
+          "url": "https://saascrmreview.com/close-pricing/",
+          "domain": "saascrmreview.com",
+          "official": false,
+          "quote": "\"Close's four plans cost $19, $49, $109 and $149 per user per month on monthly billing\""
+        }
+      ]
+    },
+    {
+      "scenario": "crm-shortlist-monday",
+      "step": 2,
+      "say": "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?",
+      "intent": "verify",
+      "firstStatusMs": 2,
+      "firstTokenMs": 1,
+      "firstModelTokenMs": 57011,
+      "totalMs": 59794,
+      "searches": 10,
+      "selfSearches": 3,
+      "covered": null,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match $80 to a current source. Treat it as unverified."
+      ],
+      "unverified": [
+        "$80"
+      ],
+      "text": "**Monday = Mon 9 Nov.**\n\nYou asked on Mon 9 Nov, 11:00: \"We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing.\"\n\nSince Mon 9 Nov: **1 changed**, 6 unchanged, 5 I couldn't verify.\n\n| What | Then (Mon 9 Nov) | Now (Thu 12 Nov) | Status |\n|---|---|---|---|\n| Zoho CRM: Standard plan price | $14 per user per month, billed annually | $14 per user per month [2] | Unchanged |\n| Zoho CRM: Professional plan price | $23 per user per month, billed annually | $23 per user per month [2] | Unchanged |\n| Zoho CRM: Enterprise plan price | $40 per user per month | $40 per user per month [2] | Unchanged |\n| Pipedrive: Lite plan price | $14 per user per month, billed annually | $14 per user per month [5] | Unchanged |\n| Pipedrive: Ultimate plan price | $79 per user per month, billed annually | $79 per user per month [5] | Unchanged |\n| Close: Entry plan price | $19 per user per month, billed monthly | not found | Couldn't verify |\n| Close: Solo plan price | $9 per month | $9 per user per month [6] | Unchanged |\n| HubSpot: Starter plan price | $20 per seat per month | not found | Couldn't verify |\n| HubSpot: Professional plan price for 20-person team | $1,565 per month | $2,000 per month [3] | **Changed** |\n| Salesforce: Starter/Essentials plan price | $25 per user per month | not found | Couldn't verify |\n| Salesforce: Professional plan price | $75 per user per month | not found | Couldn't verify |\n| Salesforce: Enterprise plan price | $165 per user per month, billed annually | not found | Couldn't verify |\n\n**No vendor pricing change since Monday is confirmed. However, Salesforce changed its editions on 3 September, before we talked, so Monday's Salesforce Enterprise figure of $165 is out of date** [1]. The only \"Changed\" row above (HubSpot) comes from a different source's estimate, not a confirmed price rise. Zoho and Pipedrive's entry and top plans are unchanged. Most sources are undated, so check each vendor's own pricing page before you sign.\n\n**What's new or needs correcting**\n\n- **Salesforce:** Enterprise and Unlimited were replaced by Core, Advanced and Max on 3 September [1]. Four sources agree on the prices, all billed annually:\n  - Core: 20 × $195 [13][14] = $3,900/month\n  - Advanced: 20 × $395 [15][16] = $7,900/month\n  - Max: 20 × $550 [13][17] = $11,000/month\n  \n  The editions also include 500,000, 1,000,000 or 2.75 million Flex Credits per org per year, in that order [17]. One undated source lists \"Pro Suite\" at $100/user/month [7], which doesn't match Monday's $75–$80 (unverified) Professional price. That figure is single-sourced.\n- **HubSpot Professional:** the new $2,000/month for 20 people is one source's estimate, worked out as \"5 base + 15 × $100\" [3]. It is single-sourced and undated. The same source puts year 1 at $25,500 [3], which is more than 12 × $2,000 = $24,000. The quoted text doesn't explain the gap.\n- **HubSpot Starter:** sources disagree. Two say $15/seat billed annually or $20 billed monthly [23][26]. One read on 22 Oct 2026 shows $20/seat plus a promotional \"starts at $7\" [24]. A guide dated March 2026 says $9 [27]. For 20 seats, that's 20 × $15 [23] = $300 or 20 × $20 [26] = $400 per month.\n- **HubSpot news:** Brian Halligan is back as CEO and leading an AI overhaul (article from 3 days ago). HubSpot also added AI spend caps and flexible billing [10]. The change to pay-per-result pricing for two Breeze AI agents is older, from 14 April [10].\n- **Close, a correction to Monday:** the $19 I called the \"entry plan\" is actually the Solo plan's monthly price. Solo is $9 billed annually [18][20]. Close's full price list:\n\n  | Plan | Annual billing | Monthly billing |\n  |---|---|---|\n  | Solo | $9 [19] | $19 [19] |\n  | Essentials | $35 [19] | $49 [19] |\n  | Growth | $99 [19] | $109 [19] |\n  | Scale | $139 [19] | $149 [19] |\n\n  For 20 users, Essentials billed annually is 20 × $35 [19] = $700/month. These sources price Solo per user and don't mention a one-user cap, so check close.com/pricing for its limits.\n- **Pipedrive:** Premium dropped from $59 to $49 in July 2026 [11]. That's before Monday, but my earlier answer left it out. The Projects add-on now shows \"Starting from $16\", down from $16.66 [9]. That source is undated.\n- **Zoho CRM:** no change. Two sources now agree on $14, $23, $40 and $52 per user per month [2][8].",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Salesforce Rebuilds Its Price List",
+          "url": "https://salesforcedictionary.com/news/salesforce-news-september-3-2026-editions-repricing-core-advanced-max",
+          "domain": "salesforcedictionary.com",
+          "official": true,
+          "quote": "\"Salesforce replaced Enterprise and Unlimited with Core, Advanced and Max editions on 3 September.\" (about 73 days old)"
+        },
+        {
+          "n": 2,
+          "title": "Zoho CRM Pricing 2026: What Each Edition Costs — AllAble",
+          "url": "https://www.allable.ai/blog/zoho-crm-pricing/",
+          "domain": "allable.ai",
+          "official": false,
+          "quote": "\"On annual billing, $14 per user a month on Standard, $23 on Professional, $40 on Enterprise and $52 on Ultimate, all USD\""
+        },
+        {
+          "n": 3,
+          "title": "HubSpot Sales Hub Pricing 2026: The $20/mo Trap and What 5, 10, and 20-Person Teams Really Pay",
+          "url": "https://marketbetter.ai/blog/hubspot-sales-hub-pricing/",
+          "domain": "marketbetter.ai",
+          "official": false,
+          "quote": "Sales Hub Professional, 20-person sales team: \"$2,000/mo (5 base + 15 × $100)\" Sales Hub Professional, 20-person sales team, year 1: \"Year 1 total | $25,500\""
+        },
+        {
+          "n": 4,
+          "title": "NVIDIA RTX 5090 returns to Newegg stock, but prices start at over 3x MSRP",
+          "url": "https://www.tweaktown.com/news/114681/nvidia-rtx-5090-returns-to-newegg-stock-but-prices-start-at-over-3x-msrp/index.html",
+          "domain": "tweaktown.com",
+          "official": false,
+          "quote": "\"$6,199.99 - $7,349.99, over three times NVIDIA's $1,999 launch MSRP.\" (RTX 5090 partner cards at Newegg; age: 1 day ago)"
+        },
+        {
+          "n": 5,
+          "title": "Pipedrive Pricing 2026: $14 to $79 Per Seat and Real Costs",
+          "url": "https://officeatlas.org/software/pipedrive-pricing/",
+          "domain": "officeatlas.org",
+          "official": false,
+          "quote": "\"Pipedrive pricing starts at $14 per seat per month on the Lite plan\" \"goes up to $79 per seat per month on Ultimate, all billed annually\""
+        },
+        {
+          "n": 6,
+          "title": "Close Review 2026: Pricing, Features, Pros & Cons",
+          "url": "https://saleshive.com/vendors/close",
+          "domain": "saleshive.com",
+          "official": false,
+          "quote": "\"Solo $9/user/mo (annual) or $19/user/mo (monthly)\""
+        },
+        {
+          "n": 7,
+          "title": "Price for Salesforce: 2026 CRM Pricing Breakdown - Tech.co",
+          "url": "https://tech.co/crm-software/salesforce-pricing-how-much-does-salesforce-cost",
+          "domain": "tech.co",
+          "official": false,
+          "quote": "\"Pro Suite $100/user/month\""
+        },
+        {
+          "n": 8,
+          "title": "Zoho CRM pricing and editions: Free vs Standard, Professional, Enterprise and Ultimate",
+          "url": "https://techyorker.com/zoho-crm-editions-explained-which-plan-fits-your-team",
+          "domain": "techyorker.com",
+          "official": false,
+          "quote": "\"Reported US list prices are $14, $23, $40 and $52 per user per month\""
+        },
+        {
+          "n": 9,
+          "title": "How Pipedrive prices: pricing page breakdown (2026)",
+          "url": "https://www.withorb.com/pricing-atlas/pipedrive",
+          "domain": "withorb.com",
+          "official": false,
+          "quote": "\"The Projects add-on now prints 'Starting from $16', down from $16.66 in the previous capture\""
+        },
+        {
+          "n": 10,
+          "title": "HubSpot Begins AI Overhaul With Founder Halligan As CEO, Again",
+          "url": "https://www.cmswire.com/digital-marketing/brian-halligan-returns-as-hubspot-ceo-replacing-yamini-rangan/",
+          "domain": "cmswire.com",
+          "official": false,
+          "quote": "\"In April 2026, HubSpot shifted two Breeze agents to pay-per-result pricing\" (3 days ago) \"HubSpot moved two Breeze AI agents to outcome-based pricing,…"
+        },
+        {
+          "n": 11,
+          "title": "Pipedrive Pricing 2026: Plans from $14–$79/user/mo",
+          "url": "https://costbench.com/software/crm/pipedrive/",
+          "domain": "costbench.com",
+          "official": false,
+          "quote": "\"Jul 2026 Pipedrive Premium decrease Premium tier decreased from $59 to $49/month -16.9%\""
+        },
+        {
+          "n": 12,
+          "title": "Pipedrive Pricing 2026: Plans, Costs & Add-ons Guide - Pipedrive",
+          "url": "https://checkthat.ai/brands/pipedrive/pricing",
+          "domain": "checkthat.ai",
+          "official": false,
+          "quote": "\"In July 2025, Pipedrive rebranded its tiers\" and \"Enterprise was replaced by Ultimate ($79)\""
+        },
+        {
+          "n": 13,
+          "title": "The new Salesforce editions: what Core, Advanced and Max change for your budget · MindBlaze",
+          "url": "https://mindblaze.ai/blog/salesforce-editions-core-advanced-max/",
+          "domain": "mindblaze.ai",
+          "official": false,
+          "quote": "\"Core at $195 per user per month, Advanced at $395, and Max at $550, billed annually\" (Salesforce Core, Advanced, Max editions, per user per month)"
+        },
+        {
+          "n": 14,
+          "title": "Salesforce Core, Advanced and Max editions explained",
+          "url": "https://dealiqinc.com/vendors/salesforce/editions/",
+          "domain": "dealiqinc.com",
+          "official": false,
+          "quote": "\"Core is $195 per user per month, Advanced $395 and Max $550, billed annually\" (Core, Advanced, Max editions, per user per month, listed on Salesforce's…"
+        },
+        {
+          "n": 15,
+          "title": "Salesforce Core, Advanced, Max Editions: 2026 Pricing",
+          "url": "https://aibrevo.com/news/salesforce-core-advanced-max-editions-2026/",
+          "domain": "aibrevo.com",
+          "official": false,
+          "quote": "\"Core is $195, Advanced $395 and Max $550 per user per month, billed yearly.\" (Salesforce Core / Advanced / Max editions)"
+        },
+        {
+          "n": 16,
+          "title": "Salesforce pricing in 2026: what Core, Advanced, and Max actually cost",
+          "url": "https://www.saasswitcher.com/blog/salesforce-pricing",
+          "domain": "saasswitcher.com",
+          "official": false,
+          "quote": "\"Core: $195 per user per month, Advanced: $395 per user per month, Max: $550 per user per month\" (Core, Advanced, Max editions, per user per month, monthly…"
+        },
+        {
+          "n": 17,
+          "title": "Salesforce License Cost Calculator · Core, Advanced, Max",
+          "url": "https://calculateforce.com/products",
+          "domain": "calculateforce.com",
+          "official": false,
+          "quote": "\"Max from $550 per user per month billed annually\" (Max Sales Cloud or Service Cloud, per user per month) \"Salesforce Core, Advanced and Max editions:…"
+        },
+        {
+          "n": 18,
+          "title": "Close CRM Pricing 2026: Solo $19 to Scale $149 + AI",
+          "url": "https://automationatlas.io/answers/close-crm-pricing-explained-2026/",
+          "domain": "automationatlas.io",
+          "official": false,
+          "quote": "\"Solo $19/user/month ($9 billed annually), Essentials $49/month ($35 annual)\""
+        },
+        {
+          "n": 19,
+          "title": "Close Pricing 2026: CRM Plans $9–139, Power Dialer From $99 · DialSheet",
+          "url": "https://www.dialsheet.io/resources/close-crm-calling-cost",
+          "domain": "dialsheet.io",
+          "official": false,
+          "quote": "\"Solo $9, Essentials $35, Growth $99 and Scale $139 on annual billing, or $19, $49, $109 and $149 month to month.\""
+        },
+        {
+          "n": 20,
+          "title": "Close CRM Review 2026: Verdict, Pricing, Limits, and Best-Fit ...",
+          "url": "https://saascrmreview.com/close-crm-review/",
+          "domain": "saascrmreview.com",
+          "official": false,
+          "quote": "\"$9 per user per month billed annually, or $19 monthly\""
+        },
+        {
+          "n": 21,
+          "title": "Close CRM Pricing 2026: $19–$149/user/mo (5 Plans)",
+          "url": "https://costbench.com/software/crm/close/",
+          "domain": "costbench.com",
+          "official": false,
+          "quote": "\"Close pricing: Solo $19, Essentials $49, Growth $109, Scale $149/user/mo.\""
+        },
+        {
+          "n": 22,
+          "title": "Close Pricing 2026: CRM Plans, Team Costs and Add-ons",
+          "url": "https://saascrmreview.com/close-pricing/",
+          "domain": "saascrmreview.com",
+          "official": false,
+          "quote": "\"Close’s four plans cost $19, $49, $109 and $149 per user per month on monthly billing\""
+        },
+        {
+          "n": 23,
+          "title": "HubSpot Sales Hub Pricing 2026: Starter vs Professional vs Enterprise Compared",
+          "url": "https://www.sybill.ai/blogs/hubspot-sales-hub-pricing",
+          "domain": "sybill.ai",
+          "official": false,
+          "quote": "\"Starter: $15 per seat per month\" on annual billing ($20 monthly)"
+        },
+        {
+          "n": 24,
+          "title": "HubSpot Pricing 2026: First-Year Cost Calculator, Per Hub or EMEA",
+          "url": "https://www.hublead.io/hubspot-pricing-calculator",
+          "domain": "hublead.io",
+          "official": false,
+          "quote": "\"Starter is listed at $20 per seat per month\" (Sales Hub, read October 22, 2026, with a promotional \"starts at $7\" annual price)"
+        },
+        {
+          "n": 25,
+          "title": "HubSpot Sales Hub Pricing 2026: Plans, Limits and What You'll Actually Pay",
+          "url": "https://www.docket.io/resources/research/hubspot-sales-hub-pricing",
+          "domain": "docket.io",
+          "official": false,
+          "quote": "\"HubSpot Sales Hub Starter is $15/seat.\""
+        },
+        {
+          "n": 26,
+          "title": "HubSpot Sales Hub Review 2026: Honest Verdict, Pricing, Pros & Cons",
+          "url": "https://www.docket.io/resources/research/hubspot-sales-hub-review",
+          "domain": "docket.io",
+          "official": false,
+          "quote": "\"Starter is $15 per seat per month (annual) or $20 per seat per month (monthly).\""
+        },
+        {
+          "n": 27,
+          "title": "HubSpot Pricing Guide (Updated for March 2026)",
+          "url": "https://marketing.bizzyweb.com/hubspot-pricing-guide",
+          "domain": "marketing.bizzyweb.com",
+          "official": false,
+          "quote": "\"Starter (Priced per seat) · $9 per seat\" (Sales Hub, updated for March 2026)"
+        }
+      ]
+    },
+    {
+      "scenario": "grounding-formats",
+      "step": 1,
+      "say": "How much does Zoho Books cost in India?",
+      "intent": "search",
+      "firstStatusMs": 1,
+      "firstTokenMs": 14726,
+      "firstModelTokenMs": 14726,
+      "totalMs": 21180,
+      "searches": 2,
+      "selfSearches": 0,
+      "covered": null,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match ₹884 to a current source. Treat it as unverified."
+      ],
+      "unverified": [
+        "₹884"
+      ],
+      "text": "**Zoho Books in India has a free plan for businesses with turnover under ₹25 lakh. Paid plans run from about ₹749 to ₹7,999 a month if you pay yearly, plus GST [3][7].** All eight sources are third-party blogs with no publication date, and they disagree on some plans. Check the final price on Zoho's official India pricing page before you buy.\n\n| Plan | Per month, billed yearly | Per month, billed monthly |\n|---|---|---|\n| Free | ₹0, turnover under ₹25 lakh [3][6][8] | ₹0 [3] |\n| Standard | ₹749 [1][3][4][7] | ₹899 [3][6][7] |\n| Professional | ₹1,499 [3][5]. One source says ₹1,249 [1] | ₹1,799 [3][5][6] |\n| Premium | ₹2,999 [3]. One source says ₹2,499 [1] | ₹3,599 [3][6] |\n| Elite | ₹4,999 [1][3] | ₹5,999 [3][6] |\n| Ultimate | ₹7,999 [3][5][7]. One source says ₹8,332 [1] | ₹9,599 [3][5][6]. Two sources say ₹9,999 [2][8] |\n\n**Where the sources disagree:**\n- **Standard and Elite:** The sources mostly agree.\n- **Premium yearly price:** Only one source gives each figure, ₹2,999 [3] and ₹2,499 [1], so neither is confirmed.\n- **Professional and Ultimate:** Most sources give the prices in the table, but one or two disagree.\n- **Mixed-up billing:** Some sources seem to mix monthly and yearly prices. For example, one lists Standard at ₹899, Professional at ₹1,499 and Premium at ₹2,999 [2]. That mixes Standard's monthly price with the yearly prices of the other two.\n\n**GST:** These prices don't include GST [4][7]. One source says to add 18% GST to every paid plan [8]. For example, Standard billed yearly works out to ₹749 [3] × 1.18 ≈ ₹884 (unverified) a month.\n\nPrices are per organisation [6]. For the current official prices, go to zoho.com/in/books/pricing.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Zoho Books Pricing in India 2026: Plans Compared",
+          "url": "https://www.patronaccounting.com/blog/zoho-books-pricing-india-2026",
+          "domain": "patronaccounting.com",
+          "official": false,
+          "quote": "\"Annual Price/Mo | Rs 0 | Rs 749 | Rs 1,249 | Rs 2,499 | Rs 4,999 | Rs 8,332\" (Free through Ultimate)"
+        },
+        {
+          "n": 2,
+          "title": "Zoho Books Pricing Calculator",
+          "url": "https://www.patronaccounting.com/tools/zoho-books-pricing-calculator",
+          "domain": "patronaccounting.com",
+          "official": false,
+          "quote": "\"Zoho Books offers 6 plans in India — Free (revenue under ₹25L), Standard (₹899/mo), Professional (₹1,499/mo), Premium (₹2,999/mo), Elite (₹5,999/mo), and…"
+        },
+        {
+          "n": 3,
+          "title": "Zoho Books Pricing India 2026",
+          "url": "https://www.redecorporativa.in/blog/zoho-books-pricing-india-2026",
+          "domain": "redecorporativa.in",
+          "official": false,
+          "quote": "\"Free | ₹0 (turnover under ₹25 lakh)\" \"Standard | ₹749 (₹899 if billed monthly)\" \"Professional | ₹1,499 (₹1,799 monthly)\" \"Premium | ₹2,999 (₹3,599…"
+        },
+        {
+          "n": 4,
+          "title": "Zoho Books Pricing and Plans Explained: What to Know",
+          "url": "https://www.patronaccounting.com/blog/zoho-books-pricing-plans",
+          "domain": "patronaccounting.com",
+          "official": false,
+          "quote": "\"Zoho Books pricing in India starts at zero.\" \"Standard | Rs 749 | 3\" (Indicative price per month, annual billing, excl. GST)"
+        },
+        {
+          "n": 5,
+          "title": "Zoho Books India: 2026 Pricing, Features, GST & Implementation",
+          "url": "https://goforfiling.com/zoho-books-india/",
+          "domain": "goforfiling.com",
+          "official": false,
+          "quote": "\"Ultimate | ₹9,599 | ₹7,999\" (Monthly Pricing / Annual Billing) \"Professional | ₹1,799 | ₹1,499\" (Monthly Pricing / Annual Pricing)"
+        },
+        {
+          "n": 6,
+          "title": "Zoho Books Free Plan 2026: The ₹25 Lakh Limit",
+          "url": "https://www.incorpx.io/blog/zoho-books-free-plan-25-lakh-limit",
+          "domain": "incorpx.io",
+          "official": false,
+          "quote": "\"Zoho Books' India prices per organisation per month are Standard ₹899, Professional ₹1,799, Premium ₹3,599, Elite ₹5,999 and Ultimate ₹9,599 on monthly…"
+        },
+        {
+          "n": 7,
+          "title": "Zoho Books Pricing in India 2026: ₹0 to ₹7,999 + GST",
+          "url": "https://www.infobyd.com/blogs/zoho-books-pricing-in-india",
+          "domain": "infobyd.com",
+          "official": false,
+          "quote": "\"Zoho Books costs ₹749 to ₹7,999 per month in India (yearly billing, plus GST)\" \"Standard | ₹899/month | ₹749/month\" (Monthly / Annual Billing)"
+        },
+        {
+          "n": 8,
+          "title": "Zoho Books Pricing in India 2026: Plans, GST, and Which One You Need",
+          "url": "https://www.zovett.com/blog/zoho-books-pricing-india-2026",
+          "domain": "zovett.com",
+          "official": false,
+          "quote": "\"Ultimate | ₹9,999/month\" \"Add 18% GST to every paid plan.\" \"Standard | ₹899/month\" (Free plan at ₹0 for turnover under ₹25 lakh)"
+        }
+      ]
+    },
+    {
+      "scenario": "grounding-formats",
+      "step": 2,
+      "say": "Does Render have a free tier for Postgres, and what does the cheapest paid Render Postgres plan cost?",
+      "intent": "search",
+      "firstStatusMs": 0,
+      "firstTokenMs": 11466,
+      "firstModelTokenMs": 11466,
+      "totalMs": 15716,
+      "searches": 1,
+      "selfSearches": 0,
+      "covered": null,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match $9 to a current source. Treat it as unverified."
+      ],
+      "unverified": [
+        "$9"
+      ],
+      "text": "**Yes, Render has a free Postgres tier, but most sources say a free database expires 30 days after you create it. The cheapest paid plan is Basic-256mb at $6 a month [2][4].** All five sources are undated third-party blogs, not Render's own pages. Check render.com/pricing before you decide.\n\n**Free tier**\n- Three sources say free Render Postgres databases expire after 30 days [1][3][4]. After that you need to upgrade or move your data elsewhere [1].\n- One source disagrees. It says the free tier includes a PostgreSQL database \"with no time limit\" [5]. It's outnumbered, so plan around the 30-day limit unless Render's own docs say otherwise.\n\n**Cheapest paid plan**\n- Basic-256mb (0.1 CPU, 256 MB RAM) costs $6 a month [2][4]. Two sources give this price. A third gives a range of about $6–7 a month [1].\n- Storage is billed separately at $0.30 per GB per month, prorated by the second [2]. Only one source gives this price.\n- For example, 10 GB of storage would cost 10 × $0.30 [2] = $3. With the $6 plan [2], that's about $9 (unverified) a month.\n\nNone of the sources are official or dated, so check the current prices and the free-tier rules at render.com/pricing and in Render's Postgres docs.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Render's Free PostgreSQL Expires After 30 Days: The Gotcha That Turns a Free-Tier Deploy Into a Migration Deadline",
+          "url": "https://bex.co/blog/2026/09/23/render-free-postgres-30-day-expiry",
+          "domain": "bex.co",
+          "official": false,
+          "quote": "\"Render's cheapest paid Postgres (Starter/basic tier) runs about $6–7 a month\""
+        },
+        {
+          "n": 2,
+          "title": "Render Pricing Guide: Free Tier, Compute and Database Costs • Kuberns",
+          "url": "https://kuberns.com/blogs/render-pricing/",
+          "domain": "kuberns.com",
+          "official": false,
+          "quote": "\"Paid Postgres compute starts with Basic-256mb at $6 per month\" \"Paid storage costs $0.30 per GB per month and is prorated by the second.\""
+        },
+        {
+          "n": 3,
+          "title": "Render Pricing 2026: Free Tier Sleep, Plans, Compute",
+          "url": "https://temps.sh/blog/render-pricing-2026",
+          "domain": "temps.sh",
+          "official": false,
+          "quote": "\"Free Render Postgres databases expire 30 days after creation.\""
+        },
+        {
+          "n": 4,
+          "title": "Render Pricing 2026: Free Tier, Plans & Real App Costs",
+          "url": "https://expresstech.io/render-pricing/",
+          "domain": "expresstech.io",
+          "official": false,
+          "quote": "\"| 0.1c-256mb | Less than 1 | 256 MB | $6/mo |\" \"free Postgres databases expire after 30 days.\""
+        },
+        {
+          "n": 5,
+          "title": "Render Pricing 2026: Plans, Cost & Free Trial",
+          "url": "https://aipriceradar.com/tool/render-pricing",
+          "domain": "aipriceradar.com",
+          "official": false,
+          "quote": "\"It includes one web service and one PostgreSQL database at no cost, with no time limit.\""
+        }
+      ]
+    },
+    {
+      "scenario": "grounding-formats",
+      "step": 3,
+      "say": "Compare Linear and Basecamp pricing for our 8-person team.",
+      "intent": "search",
+      "firstStatusMs": 0,
+      "firstTokenMs": 15725,
+      "firstModelTokenMs": 15725,
+      "totalMs": 24137,
+      "searches": 3,
+      "selfSearches": 0,
+      "covered": true,
+      "failedChecks": [],
+      "warnings": [],
+      "unverified": [],
+      "text": "**For 8 people, Linear's paid plans cost about $80–$144 a month and Basecamp's cost about $120–$299 a month. The sources disagree on several prices, and Basecamp's flat-fee plans have user caps they don't spell out.** All eight sources are undated third-party pages (checked 9 Nov 2026), so confirm on linear.app/pricing and basecamp.com/pricing before you buy.\n\n| Plan | Price | Cost for 8 people per month |\n|---|---|---|\n| Linear Basic, billed yearly | $10 per user [7] | 8 × $10 [7] = $80 |\n| Linear Basic, other figure | $12 per user [2] | 8 × $12 [2] = $96 |\n| Linear Business, billed yearly | $16 per user [1][7] | 8 × $16 [1][7] = $128 |\n| Linear Business, billed monthly | $18 per user [2][7] | 8 × $18 [2][7] = $144 |\n| Linear Enterprise | Not published [6] | Ask Linear |\n| Basecamp Plus | $15 per user [2][4] | 8 × $15 [2][4] = $120 |\n| Basecamp Pro Unlimited, billed yearly | $299 flat [2][4][8]. One source says $199 [3] | $299 or $199 |\n| Basecamp Pro Unlimited, billed monthly | $349 [4]. One source says $329 [3] | $349 or $329 |\n\n**What to watch for**\n- **Linear Basic:** $10 [7] and $12 [2] each come from one source. The $12 is probably the price if you pay monthly, but that isn't confirmed. Business is better supported: $16 billed yearly and $18 billed monthly [1][7].\n- **Linear's older plan names:** One source lists \"Standard\" at $8 and \"Plus\" at $14 [5]. These look like outdated plans, so I've left them out.\n- **Basecamp's cheaper flat plans:** One source lists Freelancer at $29, Pro at $79 and Pro Plus at $99 a month, with \"user caps\" [3]. If 8 people fit under those caps, Basecamp could cost less than Linear. No source says what the caps are. Only one source lists \"Start\" at $11 a month [5].\n- **Pro Unlimited:** The sources clash. Three say $299 billed yearly [2][4][8], but another says $199 [3]. For monthly billing, $349 [4] and $329 [3] each come from a single source.\n- **Free plans:** One source mentions a free Basecamp plan [8], but none give its limits. None mention a free Linear plan.\n\n**Bottom line:** On per-user plans, Linear Basic (8 × $10 [7] = $80) is cheaper than Basecamp Plus (8 × $15 [2][4] = $120). Basecamp's flat plans could cost less, depending on their user caps. The two tools also do different jobs: Linear tracks software issues and Basecamp manages projects. The right fit may matter more than the price difference.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Linear App Pricing: Every Plan and Seat Cost (2026)",
+          "url": "https://www.activepieces.com/blog/linear-app-pricing-every-plan-and-seat-cost-2026",
+          "domain": "activepieces.com",
+          "official": false,
+          "quote": "\"Linear charges $16 per month per seat on Business, up from $12 in October 2024\""
+        },
+        {
+          "n": 2,
+          "title": "Compare Basecamp vs Linear on TrustRadius",
+          "url": "https://www.trustradius.com/compare-products/basecamp-vs-linear-app",
+          "domain": "trustradius.com",
+          "official": false,
+          "quote": "\"Basecamp Plus $15 per month per user\" \"Basecamp Pro Unlimited $299 per month (billed annually)\" Linear Basic: \"Basic $12 per month per user\" Linear…"
+        },
+        {
+          "n": 3,
+          "title": "Basecamp pricing in 2026: plans, user caps and real costs",
+          "url": "https://www.breeze.pm/articles/basecamp-pricing",
+          "domain": "breeze.pm",
+          "official": false,
+          "quote": "\"Basecamp costs $29 a month on Freelancer, $79 on Pro and $99 on Pro Plus\" \"Pro Unlimited removes both caps for $199 a month billed annually, or $329 billed…"
+        },
+        {
+          "n": 4,
+          "title": "Basecamp Pricing Guide: How Much Does Basecamp Cost?",
+          "url": "https://www.chanty.com/blog/basecamp-pricing/",
+          "domain": "chanty.com",
+          "official": false,
+          "quote": "\"Basecamp Plus is priced at $15 per user per month\" \"On the other hand, we have Basecamp Pro Unlimited, priced at $299 per month billed annually, or $349…"
+        },
+        {
+          "n": 5,
+          "title": "Basecamp vs Linear: Which Is Better in 2026?",
+          "url": "https://findstack.com/compare/basecamp-vs-linear",
+          "domain": "findstack.com",
+          "official": false,
+          "quote": "Linear Standard: \"Standard $8.00 / month\" Linear Plus: \"Plus $14.00 / month\" Basecamp Start: \"Start $11.00 / month\""
+        },
+        {
+          "n": 6,
+          "title": "Actual Linear Pricing 2026",
+          "url": "https://www.spendhound.com/marketplace/linear-pricing",
+          "domain": "spendhound.com",
+          "official": false,
+          "quote": "\"Linear does not publish actual Enterprise pricing publicly\""
+        },
+        {
+          "n": 7,
+          "title": "Linear App Pricing: Is It Worth It in 2026?",
+          "url": "https://lifestack.ai/blog/linear-pricing",
+          "domain": "lifestack.ai",
+          "official": false,
+          "quote": "\"Basic at $10 per user per month billed annually\" \"Business at $16 per user per month billed annually ($18 billed monthly)\""
+        },
+        {
+          "n": 8,
+          "title": "Basecamp Pricing 2026: Plans & Costs",
+          "url": "https://www.larksuite.com/en_us/blog/basecamp-pricing",
+          "domain": "larksuite.com",
+          "official": false,
+          "quote": "\"Explore Basecamp pricing plans, from free to $299/month Pro Unlimited.\""
+        }
+      ]
+    }
+  ]
+}

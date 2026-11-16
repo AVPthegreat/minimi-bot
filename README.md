@@ -5,6 +5,10 @@ pings you with one line only when something you asked about has changed enough t
 
 **Live demo: https://minimi.15-252-108-184.sslip.io** (no key needed; each visitor gets a private Minimi)
 
+Hosted demo: [`deploy/README-demo.md`](deploy/README-demo.md) explains `DEMO_MODE=1`, which turns the app into a
+public demo with per-visitor isolation (own memory, chats, watchlist and clock), a spend budget persisted in SQLite
+across restarts, and per-visitor and per-IP rate limits.
+
 ![minimi bot: the home screen](docs/screens/home.jpg)
 
 ## Quick start
@@ -37,26 +41,38 @@ Has any pricing changed since then?". The report page is at http://localhost:300
 
 ## Report: how well it works
 
-Four live runs on 16 Nov 2026 with the real models (Claude Opus 5.5 for answers, Claude Haiku 5.5 for routing,
+**On the final submitted code, the full live suite passed 112 / 113 checks (99.1%)** (run 7, $1.56).
+
+Seven live runs on 16 Nov 2026 with the real models (Claude Opus 5.5 for answers, Claude Haiku 5.5 for routing,
 search and reading values) and Claude web search. After each run we fixed what failed and ran again. Run 4 added
 7 new scenarios (late-night time phrases, same-day recall, small talk, no-search questions, price formats, prompt
-injection in search results, a watchlist where nothing changed).
+injection in search results, a watchlist where nothing changed). Run 5 was the first version where the answer model
+may search on its own after the planned round; run 6 re-ran only the 3 scenarios it missed (a targeted subset, not
+comparable with the full runs); run 7 is the full suite on the final code.
 
 | Run | Scenarios | Live checks passed | Spend | Model calls | Web searches |
 |---|---:|---:|---:|---:|---:|
 | 1 | 5 | 26 / 36 (72%) | $1.28 | 43 | 56 |
 | 2 | 5 | 30 / 36 (83%) | $0.95 | 81 | 49 |
 | 3 | 5 | 33 / 36 (92%) | $0.96 | 80 | 49 |
-| 4 | 12 | **106 / 107 (99%)** | $1.53 | 138 | 70 |
+| 4 | 12 | 106 / 107 (99%) | $1.53 | 138 | 70 |
+| 5 | 12 | 104 / 107 (97%) | $2.04 | 175 | 94 |
+| 6 (targeted) | 3 | 33 / 33 (subset only) | $0.77 | 55 | 35 |
+| 7 (final code) | 12 | **112 / 113 (99.1%)** | $1.56 | 142 | 73 |
 
-- On the 5 scenarios of run 1, run 4 passed **36 / 36**.
-- The one run-4 miss was the check, not the agent: naming the 23:40 question as last night's context is correct, but
-  the check failed on any mention of it. The check is now precise (commit `9aef87d`).
-- Offline: **139 / 139** eval checks (12 multi-day scenarios on a fake clock) and **142 / 142** tests in `npm test`.
-- Total live spend for all four runs: **$4.72**.
-- Measured medians in run 4 (the live run, before the answer model could search on its own): a web-search answer
-  starts after 12.8 s and finishes in 19.6 s; a memory answer finishes in 2.9 s (its date reading and quoted question
-  appear at once).
+- On the 5 scenarios of run 1, run 7 passed **40 / 40** (later runs added checks to them; run 1 passed 26 / 36).
+- Run 5's 3 misses were all search-count checks: the model added follow-up searches even when every product already
+  had a priced source, and a comparison's first text rose to 30 to 36 s. Fixed by the coverage-guided loop (commit
+  `cad74ea`) and by counting planned and self-run searches apart in the eval (`bb41acf`). Run 6 (targeted) confirmed
+  it: 33 / 33, self-searches only where a gap existed.
+- The one run-7 miss: an "Anything new?" answer made up an illustrative example amount ($12) that no source backed.
+  The grounding guard marked it "(unverified)" in the answer; the stricter eval check (no price shown as fact without
+  a source) still counted it as a miss.
+- Offline: **141 / 141** eval checks (14 multi-day scenarios on a fake clock) and **144 / 144** tests in `npm test`.
+- Total live spend for all seven runs: **$9.09**.
+- Measured medians in run 7 (final code): a web-search answer starts after 12.6 s and finishes in 19.3 s, with
+  2.5 planned searches and 0.0 self-searches per turn; a memory answer finishes in 2.9 s (its date reading and quoted
+  question appear at once).
 
 The in-app report at **[/report](http://localhost:3000/report)** has the score timeline, every failed check per run
 with the commit that fixed it, a scenario-by-scenario table, latency by question type, the architecture and the
@@ -99,8 +115,8 @@ schema, stream events, errors, configuration, test map).
 
 | Command | What it does |
 |---|---|
-| `npm test` | 142 tests: unit tests and the offline scenarios (no network, no keys) |
-| `npm run eval` | The multi-day eval with a readable report: 139 checks offline (`EVAL_VERBOSE=1` prints answers; `EVAL_ONLY=a,b` runs only those scenarios) |
+| `npm test` | 144 tests: unit tests and the offline scenarios (no network, no keys) |
+| `npm run eval` | The multi-day eval with a readable report: 141 checks offline (`EVAL_VERBOSE=1` prints answers; `EVAL_ONLY=a,b` runs only those scenarios) |
 | `npm run eval:live` | The same scenarios against the real models and web search, capped at `MAX_SPEND_USD` (default $5) |
 | `npm run report` | Rebuilds the report data from `eval/live-reports/` and the offline runs |
 | `npm run typecheck` | `tsc --noEmit`, strict |

@@ -56,15 +56,15 @@ are cited, not checked in code.
 
 ## Cost and latency
 
-Measured in live run 4 (16 Nov, 39 turns, before the agentic loop was added): web answers start after **12.8 s** and
-finish in **19.6 s** (medians); memory answers finish in **2.9 s**, their date reading and quote at once. Run 4 cost
-$1.53, about 4 cents a turn. A spend meter caps every run.
+Measured in live run 7 (16 Nov, the final code, 39 turns): web answers start after **12.6 s** and finish in
+**19.3 s** (medians), with 2.5 planned searches and 0.0 self-searches per turn; memory answers finish in **2.9 s**,
+their date reading and quote at once. Run 7 cost $1.56, about 4 cents a turn. A spend meter caps every run.
 
 ## Testing
 
-Model, search and clock have fakes: 12 multi-day scenarios replay offline against a fixture web whose prices change
-on known dates (`npm run eval`). Four live runs scored 72%, 83%, 92%, then 106 / 107; every miss became a fix and a
-test.
+Model, search and clock have fakes: 14 multi-day scenarios replay offline against a fixture web whose prices change
+on known dates (`npm run eval`). Full live runs scored 72%, 83%, 92%, 106 / 107, 104 / 107, then **112 / 113 on the
+final code** (run 7); every miss became a fix and a test. Current counts: `public/report/data.json`.
 
 ## Decisions
 
