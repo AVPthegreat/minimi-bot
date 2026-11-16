@@ -129,3 +129,48 @@ test("end to end: only a tiny change on a one-off question means no nudge, and t
   clock.set("2026-11-16T09:30:00+05:30");
   assert.equal(await checkWatchlist(deps, "n2", clock.now(), cfg), null);
 });
+
+test("end to end (Agent): a below-threshold change stays silent, is not re-searched, and 'anything new?' reports and commits it", async () => {
+  const { Agent } = await import("../src/agent.ts");
+  const file = world([{ subject: "Gamma", plan: "Basic", then: "$10", now: "$9.90" }]);
+  const clock = new FakeClock("2026-11-10T10:00:00+05:30");
+  const inner = new FakeSearch(clock, file);
+  let searches = 0;
+  const search = { name: inner.name, search: (q: string, o?: Parameters<FakeSearch["search"]>[1]) => { searches++; return inner.search(q, o); } };
+  const store = new Store(":memory:");
+  const agent = new Agent({ store, llm: new FakeLLM(new FakeSearch(clock, file)), search, clock, timezone: "Asia/Kolkata", watch: cfg });
+  const say = async (text: string) => {
+    let out = "";
+    for await (const e of agent.chat(agent.newSession().id, text)) if (e.type === "delta") out += e.text;
+    await agent.idle();
+    return out;
+  };
+  const gamma = () => latest(store, "Gamma");
+
+  assert.match(await say("How much is the Gamma Basic plan?"), /\$10/);
+  assert.equal(gamma(), "$10", "the fact is tracked");
+
+  clock.set("2026-11-16T09:00:00+05:30");
+  searches = 0;
+  assert.equal(await agent.nudge(agent.newSession().id), null, "1% on a one-off question: silent");
+  assert.ok(searches > 0, "it was re-checked");
+  clock.set("2026-11-16T09:30:00+05:30");
+  searches = 0;
+  assert.equal(await agent.nudge(agent.newSession().id), null);
+  assert.equal(searches, 0, "the next new chat does not re-search it");
+  assert.equal(gamma(), "$10", "still pending: not committed");
+
+  // After the cooldown it is re-checked again, still below the threshold, still pending.
+  clock.set("2026-11-20T09:00:00+05:30");
+  searches = 0;
+  assert.equal(await agent.nudge(agent.newSession().id), null);
+  assert.ok(searches > 0, "re-checked after the cooldown");
+  assert.equal(gamma(), "$10");
+
+  const text = await say("Anything new?");
+  assert.match(text, /\| Gamma: Basic plan[^|]*\| \$10 per month \| \$9\.90 per month \[\d+\] \| \*\*Changed\*\*/, "reported as Changed, with its source");
+  assert.equal(gamma(), "$9.90", "committed once the user has seen it");
+  const again = await say("Anything new?");
+  assert.match(again, /\| Gamma: Basic plan[^|]*\| \$9\.90 per month \| \$9\.90 per month \[\d+\] \| Unchanged/);
+  assert.doesNotMatch(again, /\*\*Changed\*\*/, "and not reported as a change again");
+});
