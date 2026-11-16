@@ -531,7 +531,7 @@ function createDemoApp(config: Config, demo: DemoConfig): App {
         if (codeMatches(given, demo.accessCode)) {
           url.searchParams.delete("code");
           res.writeHead(303, {
-            location: url.pathname + (url.search || ""),
+            location: `/${url.pathname.replace(/^[/\\]+/, "")}${url.search}`, // never "//host": no open redirect
             "set-cookie": cookieHeader(ACCESS_COOKIE, accessToken(demo.accessCode, demo.cookieSecret), { maxAgeSec: maxAge, secure: https }),
             "cache-control": "no-store",
           });
@@ -549,7 +549,9 @@ function createDemoApp(config: Config, demo: DemoConfig): App {
 
     const v = verifyVisitor(cookies[VISITOR_COOKIE], secrets);
     const id = v?.id ?? newVisitorId();
-    if (!v || v.resign) setCookies.push(cookieHeader(VISITOR_COOKIE, signVisitor(id, demo.cookieSecret), { maxAgeSec: maxAge, secure: https }));
+    // Re-issued on page loads too, so an active visitor's cookie slides with the TTL instead of expiring mid-use.
+    const pageLoad = req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html");
+    if (!v || v.resign || pageLoad) setCookies.push(cookieHeader(VISITOR_COOKIE, signVisitor(id, demo.cookieSecret), { maxAgeSec: maxAge, secure: https }));
     if (setCookies.length) res.setHeader("set-cookie", setCookies);
     who.set(req, { id, https });
     registry.touch(id, Date.now());

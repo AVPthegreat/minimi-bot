@@ -351,6 +351,9 @@ test("access code (optional): first visit needs ?code=, then the cookie is enoug
   assert.equal(ok.headers.get("location"), "/");
   assert.equal((await b.call("/")).status, 200);
   assert.equal((await b.chat("hello")).status, 200);
+  const sneaky = await browser(s.base).call("/.//evil.example/?code=open-sesame");
+  assert.equal(sneaky.status, 303);
+  assert.match(sneaky.headers.get("location")!, /^\/(?![/\\])/, "no open redirect");
   await stop(s);
 });
 
