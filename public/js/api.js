@@ -38,14 +38,14 @@ async function request(path, opts = {}) {
 }
 
 const json = async (path, opts) => (await request(path, opts)).json();
-const post = (path, body = {}) => json(path, { method: "POST", body: JSON.stringify(body) });
+const post = (path, body = {}, signal) => json(path, { method: "POST", body: JSON.stringify(body), signal });
 
 export const api = {
   health: () => json("/api/health"),
   sessions: () => json("/api/sessions").then((d) => d.sessions ?? []),
   newSession: () => post("/api/sessions").then((d) => d.id),
   messages: (id) => json(`/api/sessions/${encodeURIComponent(id)}/messages`).then((d) => d.messages ?? []),
-  nudge: (id) => post(`/api/sessions/${encodeURIComponent(id)}/nudge`),
+  nudge: (id, signal) => post(`/api/sessions/${encodeURIComponent(id)}/nudge`, {}, signal),
   setClock: (iso) => post("/api/clock", { now: iso }),
   resetClock: () => post("/api/clock", { reset: true }),
   logoUrl: (domain) => `/api/logo?domain=${encodeURIComponent(domain)}`,

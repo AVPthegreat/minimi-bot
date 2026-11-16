@@ -19,6 +19,8 @@ export interface Visitor {
   clock: FakeClock;
   /** Chats and nudges running for this visitor right now; a busy visitor is never closed or deleted. */
   active: number;
+  /** The nudges among them: the visitor's next message cancels these instead of waiting for them. */
+  nudges: Set<AbortController>;
 }
 
 export interface PoolOptions {
@@ -57,7 +59,7 @@ export class VisitorPool {
     const saved = this.opts.registry.clock(id);
     const clock = new FakeClock(saved ?? undefined);
     const { agent } = buildAgent(this.opts.config, { clock, meter: this.opts.meter, dbPath: this.pathFor(id), publicError: this.opts.publicError });
-    v = { id, agent, clock, active: 0 };
+    v = { id, agent, clock, active: 0, nudges: new Set() };
     this.open.set(id, v);
     this.evictIdle();
     return v;

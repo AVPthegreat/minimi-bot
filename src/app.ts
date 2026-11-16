@@ -39,6 +39,8 @@ import { type FakeClock, SystemClock, addDays, civilDateOf, formatLocal, isoDate
 const PUBLIC = fileURLToPath(new URL("../public/", import.meta.url));
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".png": "image/png", ".jpg": "image/jpeg", ".json": "application/json; charset=utf-8", ".txt": "text/plain; charset=utf-8" };
 const MAX_BODY = 64 * 1024;
+/** The nudge's time limit: after this its searches are cancelled and it writes nothing. */
+const NUDGE_TIMEOUT_MS = 12_000;
 
 export class HttpError extends Error {
   constructor(
@@ -111,6 +113,8 @@ interface Mode {
   chat?: DemoChat;
   /** Demo only: may a nudge (which can spend) run now? */
   nudgeAllowed?(): boolean;
+  /** Demo only: a nudge started (its controller lets the visitor's next message cancel it); returns "ended". */
+  nudgeStarted?(v: Visitor | undefined, abort: AbortController): () => void;
   streamStarted?(v: Visitor | undefined): void;
   streamEnded?(v: Visitor | undefined): void;
   clockChanged?(ctx: Ctx, fixed: number | null): void;
@@ -200,16 +204,26 @@ async function route(m: Mode, req: IncomingMessage, res: ServerResponse): Promis
   if (req.method === "POST" && nudgeMatch) {
     const ctx = m.ctx(req, false);
     if (!ctx || (m.nudgeAllowed && !m.nudgeAllowed())) return json(res, 200, { nudge: null });
-    m.streamStarted?.(ctx.visitor);
+    // One signal cancels the nudge's searches and model call, and stops it from writing anything: the time
+    // limit (a slow web never delays the chat), the browser going away, or (demo) the visitor's own message.
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), NUDGE_TIMEOUT_MS);
+    res.on("close", () => {
+      if (!res.writableFinished) abort.abort();
+    });
+    // Every provider honours the signal, so an aborted nudge returns at once (null, nothing written). The
+    // backstop only guards against one that does not; it waits a moment so a nudge that stored its message
+    // just before the abort is still returned, never silently dropped.
+    let backstop: NodeJS.Timeout | undefined;
+    const aborted = new Promise<null>((resolve) => abort.signal.addEventListener("abort", () => (backstop = setTimeout(() => resolve(null), 2000)), { once: true }));
+    const done = m.nudgeStarted?.(ctx.visitor, abort);
     try {
-      // Bounded: a slow web never delays the chat; the nudge just doesn't appear.
-      const r = await Promise.race([
-        ctx.agent.nudge(nudgeMatch[1]!).catch(() => null),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000)),
-      ]);
+      const r = await Promise.race([ctx.agent.nudge(nudgeMatch[1]!, abort.signal).catch(() => null), aborted]);
       return json(res, 200, r ? { messageId: r.messageId, text: r.nudge.text, sources: r.nudge.sources.map((s) => ({ n: s.n, title: s.title, url: s.url, domain: s.domain, date: s.publishedDate, official: s.official })) } : { nudge: null });
     } finally {
-      m.streamEnded?.(ctx.visitor);
+      clearTimeout(timer);
+      clearTimeout(backstop);
+      done?.();
     }
   }
 
@@ -447,6 +461,14 @@ function createDemoApp(config: Config, demo: DemoConfig): App {
       };
     },
     nudgeAllowed: () => load.streams < demo.maxStreamsGlobal && meter.canStart(load.streams, demo.turnReserveUsd),
+    nudgeStarted(v, abort) {
+      mode.streamStarted!(v);
+      v?.nudges.add(abort);
+      return () => {
+        v?.nudges.delete(abort);
+        mode.streamEnded!(v);
+      };
+    },
     streamStarted(v) {
       load.streams++;
       if (v) v.active++;
@@ -493,7 +515,10 @@ function createDemoApp(config: Config, demo: DemoConfig): App {
         const wait = ipMessages.take(clientIp(req));
         if (wait) throw new HttpError(429, `Too many messages from your network. Try again in ${wait} s.`, "rate_limited", wait);
         const open = pool.peek(w.id);
-        if (open && open.active > 0) throw new HttpError(429, "Wait for the current answer to finish (or stop it) first.", "busy", 3);
+        // Typing wins over a nudge still checking: cancel it (it writes nothing, so no change is lost; the
+        // next new chat or "anything new?" reports it). Only a real answer in progress makes the visitor wait.
+        for (const a of open?.nudges ?? []) a.abort();
+        if (open && open.active - open.nudges.size > 0) throw new HttpError(429, "Wait for the current answer to finish (or stop it) first.", "busy", 3);
         if (load.streams >= demo.maxStreamsGlobal) throw new HttpError(503, "The demo is busy answering others. Try again in a few seconds.", "busy_global", 5);
         const ctx = mode.ctx(req, true)!;
         const day = today();

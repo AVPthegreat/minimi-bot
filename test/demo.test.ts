@@ -380,3 +380,43 @@ test("TTL sweep: visitors not seen for DEMO_TTL_DAYS are deleted with their file
   await pool.closeAll();
   reg.close();
 });
+
+test("typing wins over a running nudge: the nudge is cancelled (nothing written, nothing lost) and the message is served", async () => {
+  const s = await start(demoConfig());
+  const state = s.app.demoState!;
+  const a = browser(s.base);
+  await a.json("/api/clock", { now: "2026-11-10T10:00:00+05:30" });
+  await a.chat("What does Postgres hosting cost on Supabase, Neon and Railway?");
+  assert.equal((await a.json("/api/clock", { now: "2026-11-16T09:00:00+05:30" })).status, 200);
+  const sid = (await a.json("/api/sessions", {})).data.id as string;
+  const v = state.pool.peek(a.jar.get("minimi_visitor")!.split(".")[0]!)!;
+  // Hold the nudge's search open until it is cancelled, the way a slow web would.
+  const deps = (v.agent as unknown as { deps: { search: { name: string; search: (q: string, o?: { signal?: AbortSignal }) => Promise<unknown[]> } } }).deps;
+  const real = deps.search;
+  let started!: () => void;
+  const searching = new Promise<void>((r) => (started = r));
+  const seen: AbortSignal[] = [];
+  deps.search = {
+    name: real.name,
+    search: (_q, o) => {
+      started();
+      seen.push(o!.signal!);
+      return new Promise((_, reject) => o!.signal!.addEventListener("abort", () => reject(new Error("aborted")), { once: true }));
+    },
+  };
+  const nudge = a.json(`/api/sessions/${sid}/nudge`, {});
+  await Promise.race([searching, nudge.then((n) => Promise.reject(new Error(`the nudge ended without searching: ${JSON.stringify(n.data)}`)))]);
+  const r = await a.chat("hi", sid);
+  assert.equal(r.status, 200, "not 429 busy");
+  assert.ok(r.events.some((e) => e.type === "done"));
+  assert.deepEqual((await nudge).data, { nudge: null });
+  assert.ok(seen.length > 0 && seen.every((x) => x.aborted), "the nudge's searches were cancelled");
+  assert.deepEqual((await a.json(`/api/sessions/${sid}/messages`)).data.messages.map((m: { role: string }) => m.role), ["user", "assistant"]);
+  assert.equal(v.nudges.size, 0);
+  assert.equal(state.load.streams, 0);
+  deps.search = real;
+  // The change the cancelled nudge was checking is still reported.
+  const news = await a.chat("Anything new?");
+  assert.match(answerText(news.events), /\| Neon: Launch plan[^|]*\|[^\n]*Changed/);
+  await stop(s);
+});
