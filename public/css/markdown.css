@@ -25,8 +25,16 @@
 
 /* Tables */
 .table-wrap { margin: 4px 0 12px; overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--line); background: var(--card); }
+/* Cells never break a word letter by letter (the answer's overflow-wrap:anywhere made "Supabase" read
+   "Su/pa/ba/se" in a crushed first column): words wrap only at spaces, every column keeps a readable
+   minimum, the first column (product names) stays on one line when short, and a table wider than its
+   container scrolls sideways inside .table-wrap instead of squeezing its columns. */
 .md table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-.md th, .md td { padding: 8px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.md th, .md td { padding: 8px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); overflow-wrap: normal; word-break: normal; hyphens: manual; min-width: 7em; }
+.md tr > :first-child { min-width: 8em; }
+.md td.nowrap { white-space: nowrap; }
+.compare tbody th { min-width: 10em; }
+.compare td:last-child { white-space: nowrap; }
 .md thead th { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); background: var(--panel); white-space: nowrap; }
 .md tbody tr:last-child > * { border-bottom: 0; }
 .md tbody tr:hover { background: var(--panel); }

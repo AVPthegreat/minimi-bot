@@ -566,7 +566,7 @@ answer text and fails on any unmarked price no source states (`eval/scenarios.ts
 
 **Measured:** live run 7, the full suite on the final code, passed 112 of 113 checks (the miss: an illustrative
 $12 in an "anything new?" answer, marked "(unverified)" by the guard but still counted by the stricter eval check).
-Offline: 141 of 141 eval checks; `npm test`: 144 of 144 tests. `public/report/data.json` holds the current counts:
+Offline: 141 of 141 eval checks; `npm test`: 145 of 145 tests. `public/report/data.json` holds the current counts:
 `npm run report` reruns them and flags a README that quotes another count.
 
 ## 15. Scaling path

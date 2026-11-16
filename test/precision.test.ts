@@ -162,6 +162,42 @@ test("diff: a status-only change is 'Unchanged, now confirmed'; wording-only cha
   assert.equal(diffClaim(was("$20", "per seat per month"), { value: "$20", unit: "per organization per month" }).status, "changed");
 });
 
+test("diff: unit synonyms and abbreviations are the same unit; a real amount, currency or unit change stays Changed", () => {
+  const was = (value: string, unit: string | null) => ({ subject: "Neon", attribute: "Compute price", value, unit });
+  const same = (a: [string, string | null], b: { value: string; unit?: string | null }) =>
+    assert.equal(diffClaim(was(...a), b).status, "unchanged", `${a.join(" ")} -> ${b.value} ${b.unit ?? ""}`);
+  const changed = (a: [string, string | null], b: { value: string; unit?: string | null }) =>
+    assert.equal(diffClaim(was(...a), b).status, "changed", `${a.join(" ")} -> ${b.value} ${b.unit ?? ""}`);
+  // The two live rows (Neon Launch and Scale compute): only the unit wording differs.
+  same(["$0.106", "per CU-hr"], { value: "$0.106", unit: "per CU-hour" });
+  same(["$0.222", "per CU-hr"], { value: "$0.222", unit: "per CU-hour" });
+  same(["$0.106 per CU-hr", null], { value: "$0.106 per CU-hour" });
+  same(["$0.106", "per CU-hr"], { value: "$0.106", unit: "per compute-hour" });
+  same(["$0.106", "per CU-hr"], { value: "$0.106", unit: "per compute unit hour" });
+  same(["$0.10", "/h"], { value: "$0.10", unit: "per hours" });
+  same(["$0.01", "per min"], { value: "$0.01", unit: "per minute" });
+  same(["$19", "/mo"], { value: "$19", unit: "per month" });
+  same(["$19/mo", null], { value: "$19", unit: "monthly" });
+  same(["$190", "per yr"], { value: "$190", unit: "annually" });
+  same(["$4", "per wk"], { value: "$4", unit: "weekly" });
+  same(["$0.023", "per GB-mo"], { value: "$0.023", unit: "per GB-month" });
+  same(["$8", "per user per month"], { value: "$8", unit: "per seat / month" });
+  same(["$8", "Per Users, Per Month."], { value: "$8", unit: "per user per month" });
+  same(["USD 5", "per month"], { value: "$5", unit: "per month" });
+  // Status-only: still "Unchanged, now confirmed".
+  const confirmed = diffClaim(was("$0.106 (unverified)", "per CU-hr"), { value: "$0.106", unit: "per CU-hour", sourceN: 2 });
+  assert.match(renderDiffTable([confirmed], "Tue 3 Nov", "Sun 15 Nov"), /\| Unchanged, now confirmed \|/);
+  // True changes stay Changed.
+  changed(["$19", "per month"], { value: "$15", unit: "per month" });
+  changed(["$19", "/mo"], { value: "$15", unit: "monthly" });
+  changed(["$19", "per month"], { value: "$19", unit: "per year" });
+  changed(["$19/mo", null], { value: "$19/yr" });
+  changed(["$8", "per user"], { value: "$8", unit: "per workspace" });
+  changed(["$0.106", "per CU-hr"], { value: "$0.106", unit: "per CU-month" });
+  changed(["$0.106", "per CU-hr"], { value: "$0.16", unit: "per CU-hour" });
+  changed(["$5", "per month"], { value: "€5", unit: "per month" });
+});
+
 // ---- 4. The eval's grounding check: fails on a price shown as fact without a source, counts flagged ones apart.
 
 test("eval check: an unmarked unsourced price fails; an honestly flagged one passes and is counted", async () => {

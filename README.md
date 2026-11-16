@@ -68,7 +68,7 @@ comparable with the full runs); run 7 is the full suite on the final code.
 - The one run-7 miss: an "Anything new?" answer made up an illustrative example amount ($12) that no source backed.
   The grounding guard marked it "(unverified)" in the answer; the stricter eval check (no price shown as fact without
   a source) still counted it as a miss.
-- Offline: **141 / 141** eval checks (14 multi-day scenarios on a fake clock) and **144 / 144** tests in `npm test`.
+- Offline: **141 / 141** eval checks (14 multi-day scenarios on a fake clock) and **145 / 145** tests in `npm test`.
 - Total live spend for all seven runs: **$9.09**.
 - Measured medians in run 7 (final code): a web-search answer starts after 12.6 s and finishes in 19.3 s, with
   2.5 planned searches and 0.0 self-searches per turn; a memory answer finishes in 2.9 s (its date reading and quoted
@@ -115,7 +115,7 @@ schema, stream events, errors, configuration, test map).
 
 | Command | What it does |
 |---|---|
-| `npm test` | 144 tests: unit tests and the offline scenarios (no network, no keys) |
+| `npm test` | 145 tests: unit tests and the offline scenarios (no network, no keys) |
 | `npm run eval` | The multi-day eval with a readable report: 141 checks offline (`EVAL_VERBOSE=1` prints answers; `EVAL_ONLY=a,b` runs only those scenarios) |
 | `npm run eval:live` | The same scenarios against the real models and web search, capped at `MAX_SPEND_USD` (default $5) |
 | `npm run report` | Rebuilds the report data from `eval/live-reports/` and the offline runs |

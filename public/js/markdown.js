@@ -84,6 +84,8 @@ function table(head, rows, sources) {
           }
           if (compare && i === nowCol && /^not found$/i.test(c)) return `<td class="muted-cell">not found</td>`;
           if (compare && (i === thenCol || i === nowCol)) return `<td class="${i === nowCol ? "now" : "then"}">${inline(c, sources)}</td>`;
+          // A short first-column name ("Supabase") stays on one line; a long one may wrap at spaces.
+          if (i === 0 && c.trim().length <= 24) return `<td class="nowrap">${inline(c, sources)}</td>`;
           return `<td>${inline(c, sources)}</td>`;
         })
         .join("");

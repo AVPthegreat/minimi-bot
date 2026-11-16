@@ -77,8 +77,14 @@ export function diffClaim(
   // "Changed" means the value changed, never only its wording or its verification status
   // (live: "$5 (unverified) per month per account" then, "$5 per month [5]" now was shown as Changed).
   const oldValue = stripUnverified(old.value);
-  const unitChanged = !!(old.unit && fresh.unit && !sameUnit(old.unit, fresh.unit));
-  const changed = !(sameValue(oldValue, fresh.value) || sameWording(oldValue, fresh.value)) || unitChanged;
+  // The unit may sit in the unit field or inside the value ("$5/mo"); compare whichever both sides have.
+  const oldUnit = old.unit || unitInValue(oldValue);
+  const freshUnit = fresh.unit || unitInValue(fresh.value);
+  const unitChanged = !!(oldUnit && freshUnit && !sameUnit(oldUnit, freshUnit));
+  const was = parseValue(oldValue);
+  const now = parseValue(fresh.value);
+  const currencyChanged = !!(was.currency && now.currency && was.currency !== now.currency); // "$5" -> "€5"
+  const changed = !(sameValue(oldValue, fresh.value) || sameWording(oldValue, fresh.value)) || unitChanged || currencyChanged;
   const confirmed = !changed && oldValue !== old.value.trim();
   return {
     ...base,
@@ -96,15 +102,43 @@ function stripUnverified(v: string): string {
 }
 
 const UNIT_FILLER = new Set(["a", "an", "per", "each", "the", "of", "every"]);
+/**
+ * Unit synonyms and abbreviations mapped to one word, so only a real unit change counts as Changed
+ * (live: "$0.106 per CU-hr" then, "$0.106 per CU-hour" now was shown as Changed). Conservative: user and
+ * seat are the same billing concept; workspace, organization, project and account stay different.
+ */
 const UNIT_WORD: Record<string, string> = {
-  mo: "month", monthly: "month", months: "month", yr: "year", annually: "year", annual: "year", yearly: "year", years: "year",
+  // time
+  sec: "second", secs: "second", seconds: "second",
+  min: "minute", mins: "minute", minutes: "minute",
+  h: "hour", hr: "hour", hrs: "hour", hours: "hour", hourly: "hour",
+  days: "day", daily: "day",
+  wk: "week", wks: "week", weeks: "week", weekly: "week",
+  mo: "month", mos: "month", mth: "month", mths: "month", months: "month", monthly: "month",
+  yr: "year", yrs: "year", years: "year", annually: "year", annual: "year", yearly: "year", annum: "year",
+  // compute ("CU-hr" = "compute-hour" = "compute unit hour")
+  cu: "compute", cus: "compute",
+  // seats
   user: "seat", users: "seat", seats: "seat", licence: "seat", license: "seat", licenses: "seat", licences: "seat",
+  // currency words sometimes left in the unit
+  usd: "", dollar: "", dollars: "",
 };
 
 function unitWords(u: string): Set<string> {
   return new Set(
-    u.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w && !UNIT_FILLER.has(w)).map((w) => UNIT_WORD[w] ?? (w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w)),
+    u
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w && !UNIT_FILLER.has(w))
+      .map((w) => UNIT_WORD[w] ?? (w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w))
+      .filter((w) => w),
   );
+}
+
+/** The unit written inside a value ("$5/mo", "$0.106 per CU-hr"), or null. */
+export function unitInValue(value: string): string | null {
+  const m = value.match(/\d(?:[\d,.]*\d)?\s*(?:[km]\b)?\s*(?:usd|eur|gbp|inr)?\s*((?:\/|\bper\b|\ba\s+(?:month|year|user|seat)\b|\b(?:monthly|yearly|annually|hourly)\b).*)$/i);
+  return m ? m[1]!.replace(/\s*\(unverified\)/gi, "").trim() || null : null;
 }
 
 /**
