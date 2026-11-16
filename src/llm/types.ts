@@ -4,7 +4,6 @@
 import type { ClaimRow, NewClaim } from "../db.ts";
 import type { DiffRow } from "../claims.ts";
 import type { Source } from "../search/rank.ts";
-import type { SearchResult } from "../search/types.ts";
 
 /** "updates" = "anything new?": re-check the whole watchlist (rules-routed only). */
 export type Intent = "chat" | "recall" | "verify" | "search" | "updates";
@@ -59,19 +58,42 @@ export interface AnswerInput {
   shown: string[];
   highStakes: boolean;
   /**
-   * How many web searches the answer model may run itself: only when the agent's own planned searches
-   * found nothing (the fallback loop). 0 = write only from the gathered sources (the normal case).
+   * The answer model's one tool, web_search: how many more searches it may run this turn (the agent's
+   * bounded loop; 0 = the tool is unavailable, write the answer now). Small talk and recall always get 0.
    */
   maxSelfSearches: number;
+  /** Computed in code: for each product the question names, the planned sources that give it a price (empty = a gap). */
+  coverage?: Array<{ subject: string; sources: number[] }>;
+  /**
+   * The tool rounds so far this turn, oldest first: what the model asked for and what the agent found.
+   * `sources` above stays the planned round's evidence; sources found by the tool are in these results.
+   */
+  rounds: ToolRound[];
   signal?: AbortSignal;
 }
 
-/** What the answer model streams back: text, plus (when it searches on its own) what it looked up and cited. */
+export interface ToolCall {
+  id: string;
+  query: string;
+}
+
+/** One round of the agent loop: the model's tool calls and the agent's results (same order). */
+export interface ToolRound {
+  /** What the model wrote before calling the tool (already shown to the user). */
+  text: string;
+  calls: ToolCall[];
+  /** The pages each call found, numbered like the other sources (cite as [n]), or why it did not run. */
+  results: Array<{ id: string; sources: Source[]; error?: string }>;
+  /** The provider's own record of the assistant turn (e.g. Anthropic content blocks), replayed as is. */
+  state?: unknown;
+}
+
+/** What the answer model streams back: text, and the tool calls that end a round of the loop. */
 export type AnswerEvent =
   | { type: "text"; text: string }
-  | { type: "searching"; query: string }
-  | { type: "source"; result: SearchResult }
-  | { type: "cite"; url: string; title: string | null; citedText: string };
+  | { type: "tool_call"; id: string; query: string }
+  /** End of a round that called the tool: the provider's record of it (see ToolRound.state). */
+  | { type: "round_state"; state: unknown };
 
 export interface RecheckResult {
   value: string;

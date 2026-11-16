@@ -25,6 +25,36 @@ function env(name: string, fallback = ""): string {
 }
 
 export type Effort = "low" | "medium" | "high";
+const EFFORTS: readonly Effort[] = ["low", "medium", "high"];
+
+/** The machine's own time zone (what "today" means for the person running it), e.g. "Europe/Berlin". */
+export function systemTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+/** An IANA zone name the runtime knows, or a clear error naming the variable. */
+function checkedTimezone(tz: string): string {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return tz;
+  } catch {
+    throw new Error(`USER_TIMEZONE must be an IANA time zone like "Asia/Kolkata" or "Europe/Berlin" (got "${tz}")`);
+  }
+}
+
+function spendCap(raw: string): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) throw new Error(`MAX_SPEND_USD must be a number of dollars, 0 or more (got "${raw}")`);
+  return n;
+}
+
+/** A whole number in [min, max], or a clear error naming the variable (never a silent NaN). */
+function intEnv(name: string, fallback: number, min: number, max: number): number {
+  const raw = env(name, String(fallback));
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < min || n > max) throw new Error(`${name} must be a whole number from ${min} to ${max} (got "${raw}")`);
+  return n;
+}
 
 export interface Config {
   port: number;
@@ -49,7 +79,7 @@ export interface Config {
   tavilyKey: string;
   /** Hard cap on Anthropic spend per process, in USD (empty = no cap). */
   maxSpendUsd: number | null;
-  /** Web searches the answer model may run on its own per turn, only when the planned searches found nothing. */
+  /** Follow-up web searches the answer model may run itself per turn, after the planned round (the agent loop's bound). */
   answerMaxSearches: number;
   watchEnabled: boolean;
   watchAfterDays: number;
@@ -70,11 +100,14 @@ export function loadConfig(): Config {
   if (wanted === "tavily" && !tavilyKey && !fakeMode) throw new Error("SEARCH_PROVIDER=tavily needs TAVILY_API_KEY");
   const searchProvider = fakeMode ? "fake" : wanted === "auto" ? (tavilyKey ? "tavily" : "anthropic") : (wanted as "tavily" | "anthropic");
   const cap = env("MAX_SPEND_USD");
+  const effort = env("ANSWER_EFFORT", "medium");
+  if (!EFFORTS.includes(effort as Effort)) throw new Error(`ANSWER_EFFORT must be low, medium or high (got "${effort}")`);
   return {
-    port: Number(env("PORT", "3000")),
+    port: intEnv("PORT", 3000, 0, 65535),
     host: env("HOST", "127.0.0.1"),
     dbPath: env("DB_PATH", "data/minimi.db"),
-    timezone: env("USER_TIMEZONE", "Asia/Kolkata"),
+    // The person's zone decides what "today" and "last Tuesday" mean: the system's, unless USER_TIMEZONE says otherwise.
+    timezone: checkedTimezone(env("USER_TIMEZONE", systemTimezone())),
     fixedNow: env("MINIMI_NOW"),
     allowClockOverride: fakeMode || env("ALLOW_CLOCK_OVERRIDE") === "1",
     fakeMode,
@@ -82,16 +115,16 @@ export function loadConfig(): Config {
     anthropicKey,
     answerModel: env("ANSWER_MODEL", "claude-opus-5-5"),
     fastModel: env("FAST_MODEL", "claude-haiku-5-5"),
-    answerEffort: (env("ANSWER_EFFORT", "medium") as Effort),
+    answerEffort: effort as Effort,
     fastSpeed: env("FAST_OUTPUT") === "1",
     searchProvider,
     searchModel: env("SEARCH_MODEL", "claude-haiku-5-5"),
     tavilyKey,
-    maxSpendUsd: cap ? Number(cap) : null,
-    answerMaxSearches: Math.max(0, Math.min(5, Number(env("ANSWER_MAX_SEARCHES", "3")))),
+    maxSpendUsd: cap ? spendCap(cap) : null,
+    answerMaxSearches: Math.min(5, intEnv("ANSWER_MAX_SEARCHES", 3, 0, Number.MAX_SAFE_INTEGER)),
     watchEnabled: env("WATCH_ENABLED", "1") !== "0",
-    watchAfterDays: Number(env("WATCH_AFTER_DAYS", "3")),
-    watchMaxSearches: Number(env("WATCH_MAX_SEARCHES", "3")),
+    watchAfterDays: intEnv("WATCH_AFTER_DAYS", 3, 0, 3650),
+    watchMaxSearches: intEnv("WATCH_MAX_SEARCHES", 3, 0, 20),
     logoFetch: env("LOGO_FETCH", "1") !== "0",
   };
 }

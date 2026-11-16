@@ -4,6 +4,7 @@
 // unsourced prices, searches on its own when given a tool).
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { renderAnswerTurn } from "../src/llm/prompts.ts";
 import { Agent, type AgentEvent } from "../src/agent.ts";
 import { priceChecker, unsupportedPrices } from "../src/claims.ts";
 import { Store } from "../src/db.ts";
@@ -63,16 +64,23 @@ test("a comparison fans out one search per product, started before the (slow) ro
   for (const d of ["hubspot.com", "pipedrive.com", "salesforce.com", "zoho.com", "close.com"]) assert.ok(domains.includes(d), `${d} is a source`);
 });
 
-test("the answer model gets no web_search of its own when the agent's searches found sources", async () => {
+test("every product priced by the planned round: the tool stays offered but capped at 1, with a coverage note, and unused", async () => {
   const budgets: number[] = [];
   const clock = new FakeClock("2026-11-10T10:00:00+05:30");
   const llm = new FakeLLM(new FakeSearch(clock), { slowRouter: true });
   const base = llm.streamAnswer.bind(llm);
-  llm.streamAnswer = (input: AnswerInput) => (budgets.push(input.maxSelfSearches), base(input));
+  const coverage: unknown[] = [];
+  llm.streamAnswer = (input: AnswerInput) => (budgets.push(input.maxSelfSearches), coverage.push(input.coverage), base(input));
   const store = new Store(":memory:");
-  const agent = new Agent({ store, llm, search: new FakeSearch(clock), clock, timezone: "Asia/Kolkata" });
+  const search = new FakeSearch(clock);
+  const agent = new Agent({ store, llm, search, clock, timezone: "Asia/Kolkata" });
   await run(agent, agent.newSession().id, "What does Postgres hosting cost on Supabase, Neon and Railway?");
-  assert.deepEqual(budgets, [0]);
+  assert.deepEqual(budgets, [1], "one model call; coverage is complete, so at most one follow-up was allowed");
+  const cov = coverage[0] as Array<{ subject: string; sources: number[] }>;
+  assert.deepEqual(cov.map((c) => c.subject).sort(), ["Neon", "Railway", "Supabase"]);
+  assert.ok(cov.every((c) => c.sources.length > 0), "each product has a priced source");
+  assert.match(renderAnswerTurn({ intent: "search", question: "q", nowLabel: "now", history: [], sources: [], memory: [], notes: [], shown: [], highStakes: false, maxSelfSearches: 1, rounds: [], coverage: [{ subject: "Neon", sources: [2] }, { subject: "Close", sources: [] }] }), /<coverage>\nNeon: priced in \[2\]\nClose: NO priced source\n<\/coverage>/);
+  assert.equal(search.log.length, 4, "only the planned round ran: the question + one per product");
 });
 
 // ---- 1b. Grounding enforced in code: an unsourced price never reaches the user as fact.

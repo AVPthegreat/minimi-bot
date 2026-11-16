@@ -43,6 +43,7 @@ the "answers running" counters live in that process (the ledger itself is in SQL
 | `DEMO_ACCESS_CODE` | empty | When set, the first visit needs `?code=…` (then a cookie) |
 
 The usual settings still apply (`ANTHROPIC_API_KEY`, `TAVILY_API_KEY`, `USER_TIMEZONE`, `LOGO_FETCH`, models).
+`USER_TIMEZONE` defaults to the server's own zone (often UTC on a VPS): set it to your visitors' zone, e.g. `Asia/Kolkata`.
 `MAX_SPEND_USD` is ignored in demo mode: the ledger replaces it.
 
 ## Behind Caddy (automatic HTTPS)

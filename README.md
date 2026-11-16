@@ -3,7 +3,7 @@
 A chat agent that searches the web, remembers **what you asked and when**, re-checks its own past answers, and
 pings you with one line only when something you asked about has changed enough to matter now.
 
-**Live demo: https://minimi.faurus.app**
+**Live demo: https://minimi.15-252-108-184.sslip.io** (no key needed; each visitor gets a private Minimi)
 
 ![minimi bot: the home screen](docs/screens/home.jpg)
 
@@ -52,7 +52,7 @@ injection in search results, a watchlist where nothing changed).
 - On the 5 scenarios of run 1, run 4 passed **36 / 36**.
 - The one run-4 miss was the check, not the agent: naming the 23:40 question as last night's context is correct, but
   the check failed on any mention of it. The check is now precise (commit `9aef87d`).
-- Offline: **133 / 133** eval checks (12 multi-day scenarios on a fake clock) and **135 / 135** tests in `npm test`.
+- Offline: **139 / 139** eval checks (12 multi-day scenarios on a fake clock) and **142 / 142** tests in `npm test`.
 - Total live spend for all four runs: **$4.72**.
 - Measured medians in run 4 (the live run, before the answer model could search on its own): a web-search answer
   starts after 12.8 s and finishes in 19.6 s; a memory answer finishes in 2.9 s (its date reading and quoted question
@@ -99,8 +99,8 @@ schema, stream events, errors, configuration, test map).
 
 | Command | What it does |
 |---|---|
-| `npm test` | 135 tests: unit tests and the offline scenarios (no network, no keys) |
-| `npm run eval` | The multi-day eval with a readable report: 133 checks offline (`EVAL_VERBOSE=1` prints answers) |
+| `npm test` | 142 tests: unit tests and the offline scenarios (no network, no keys) |
+| `npm run eval` | The multi-day eval with a readable report: 139 checks offline (`EVAL_VERBOSE=1` prints answers; `EVAL_ONLY=a,b` runs only those scenarios) |
 | `npm run eval:live` | The same scenarios against the real models and web search, capped at `MAX_SPEND_USD` (default $5) |
 | `npm run report` | Rebuilds the report data from `eval/live-reports/` and the offline runs |
 | `npm run typecheck` | `tsc --noEmit`, strict |
