@@ -27,7 +27,8 @@ const SELF_SEARCH_RESULTS = 5;
  */
 export async function* answer(t: Turn, web: boolean): AsyncGenerator<AgentEvent> {
   const { deps, intent, signal } = t;
-  const budget = web ? Math.max(0, deps.maxSelfSearches ?? 3) : 0;
+  const max = deps.maxSelfSearches ?? 3;
+  const budget = web && Number.isInteger(max) ? Math.max(0, max) : 0;
   /** The planned round's sources: the model's first message stays the same across rounds. */
   const planned = t.sources.slice();
   const rounds: ToolRound[] = [];

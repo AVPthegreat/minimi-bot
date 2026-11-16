@@ -243,9 +243,10 @@ async function route(m: Mode, req: IncomingMessage, res: ServerResponse): Promis
     const body = await readJson(req, m.maxBody);
     const text = typeof body.text === "string" ? body.text : "";
     if (m.chat) return demoChat(m, m.chat, req, res, body, text);
+    // Refuse an empty message before anything is created (no empty session in the sidebar).
+    if (!text.trim()) throw new HttpError(400, "Say something first.");
     const agent = m.ctx(req, true)!.agent;
     const sessionId = typeof body.sessionId === "string" && /^[\w-]{1,64}$/.test(body.sessionId) ? body.sessionId : agent.newSession().id;
-    if (!text.trim()) throw new HttpError(400, "Say something first.");
     res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive" });
     const abort = new AbortController();
     res.on("close", () => {
