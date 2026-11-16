@@ -62,6 +62,8 @@ export function canonicalSubject<T extends { subject: string; attribute: string 
   const s = claim.subject.trim();
   for (const planned of subjects) {
     if (s.toLowerCase() === planned.toLowerCase()) return { ...claim, subject: planned };
+    // The model shortened the name ("Zoho" for "Zoho CRM"): file it under the name that was searched.
+    if (planned.toLowerCase().startsWith(s.toLowerCase() + " ")) return { ...claim, subject: planned };
     if (s.toLowerCase().startsWith(planned.toLowerCase() + " ")) {
       const extra = s.slice(planned.length).trim();
       const attribute = claim.attribute.toLowerCase().startsWith(extra.toLowerCase()) ? claim.attribute : `${extra} ${claim.attribute}`;

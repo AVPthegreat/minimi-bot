@@ -17,9 +17,6 @@ export interface WatchConfig {
   maxSearches: number;
 }
 
-/** At most this many facts per subject in one check, so "anything new?" stays a short table. */
-export const MAX_FACTS_PER_SUBJECT = 2;
-
 export interface Nudge {
   text: string; // markdown, one or two lines
   sources: Source[];
@@ -30,14 +27,20 @@ export interface WatchDeps extends RecheckDeps {
   tz: string;
 }
 
+/** Rows "anything new?" shows: changes first, then unverified, then unchanged (all facts are still re-checked). */
+export const MAX_ROWS_SHOWN = 6;
+/** A guard on model input size, not a display bound: facts of one subject read from its one search. */
+const MAX_FACTS_PER_SUBJECT = 8;
+
 /**
- * Facts due for a re-check: newest interest first, one per subject + attribute. Bounded in code: at
- * most `maxSearches` subjects and `MAX_FACTS_PER_SUBJECT` facts each (the live run re-checked 3
- * subjects but showed every fact of each, so "anything new?" became a long table).
+ * Facts due for a re-check: newest interest first, one per subject + attribute, bounded in code to
+ * `maxSearches` subjects (one search each). EVERY due fact of a chosen subject is included: they share
+ * that subject's search, and a fact left out stays due, so the next new chat searched again (live
+ * 16 Nov, run 2: the 4th chat ran 2 searches after the 3rd had checked the same subjects).
  */
 export function dueClaims(store: Store, nowMs: number, cfg: WatchConfig, force = false): ClaimRow[] {
   const olderThan = force ? nowMs + 1 : nowMs - cfg.afterDays * 86400000;
-  const all = store.watchCandidates(olderThan, 40);
+  const all = store.watchCandidates(olderThan, 60);
   const perSubject = new Map<string, number>();
   return all.filter((c) => {
     const s = c.subject.trim().toLowerCase();
@@ -47,6 +50,13 @@ export function dueClaims(store: Store, nowMs: number, cfg: WatchConfig, force =
     perSubject.set(s, (n ?? 0) + 1);
     return true;
   });
+}
+
+/** The rows worth showing, at most `max`: changed, then couldn't-verify, then unchanged (original order within each). */
+export function rowsToShow<T extends { status: string }>(rows: T[], max = MAX_ROWS_SHOWN): T[] {
+  const rank = (r: T) => (r.status === "changed" ? 0 : r.status === "unverified" ? 1 : 2);
+  const keep = new Set([...rows].sort((a, b) => rank(a) - rank(b)).slice(0, max));
+  return rows.filter((r) => keep.has(r));
 }
 
 /**

@@ -18,7 +18,7 @@ import { type QueryRun, type Source, domainOf, isOfficialFor, rankSources, runQu
 import type { SearchProvider, SearchResult } from "./search/types.ts";
 import { type Clock, civilDateOf, daysBetween, formatCivil, formatLocal } from "./time.ts";
 import { parseTimeRefs } from "./timeparse.ts";
-import { type Nudge, type WatchConfig, checkWatchlist, dueClaims } from "./watch.ts";
+import { type Nudge, type WatchConfig, checkWatchlist, dueClaims, rowsToShow } from "./watch.ts";
 
 export interface AgentDeps {
   store: Store;
@@ -225,10 +225,14 @@ export class Agent {
           const outcome = yield* drain(recheckClaims(this.deps, claims, { nowMs: now, maxQueries, newsSinceDays: sinceDays, signal, onRun }), updates);
           runs.push(...outcome.runs);
           sources = outcome.sources;
-          const table = renderDiffTable(outcome.rows, thenLabel, formatCivil(civilDateOf(now, tz), civilDateOf(now, tz)));
-          diff = { rows: outcome.rows, table, thenLabel };
+          // "Anything new?" shows a short table (changes first); every fact was still re-checked and saved.
+          const rows = plan.intent === "updates" ? rowsToShow(outcome.rows) : outcome.rows;
+          const hidden = outcome.rows.length - rows.length;
+          const table = renderDiffTable(rows, thenLabel, formatCivil(civilDateOf(now, tz), civilDateOf(now, tz)));
+          diff = { rows, table, thenLabel };
           recheckToSave = outcome;
-          const ev = show([summarizeDiff(outcome.rows, thenLabel), table]);
+          const more = hidden ? [`(${hidden} more fact${hidden > 1 ? "s" : ""} checked: ${countBy(outcome.rows.filter((r) => !rows.includes(r)))}.)`] : [];
+          const ev = show([summarizeDiff(outcome.rows, thenLabel), table, ...more]);
           if (ev) yield ev;
         } else if (plan.intent === "verify" && memory.length) {
           // The earlier answer had no stored facts: search the earlier question again and let the
@@ -296,7 +300,10 @@ export class Agent {
     const evidence = (): EvidenceDoc[] => [
       ...sources.map((x) => ({ text: `${x.title}\n${x.snippet}`, about: x.query === specQuery ? x.title : `${x.title} ${x.query}` })),
       { text: diff?.table ?? "" },
-      ...(intent === "recall" ? memory.map((t) => ({ text: t.answer })) : []),
+      // What was said before (the earlier answer, earlier in this chat) backs a price only as history:
+      // fully in a recall answer, and elsewhere only where the sentence says it was the price then.
+      ...memory.map((t) => ({ text: t.answer, pastOnly: intent !== "recall" })),
+      ...history.filter((m) => m.role === "assistant").map((m) => ({ text: m.content, pastOnly: intent !== "recall" })),
     ];
     const multipliers = questionMultipliers(text);
     const guard = new GroundingGuard((line) => priceChecker(evidence(), { multipliers })(line));
@@ -394,7 +401,10 @@ export class Agent {
         llm.extractClaims({ question: text, answer, sources }).then((claims) => {
           const known = fairCap(
             claims
-              .filter((c) => c.subject && c.attribute && c.value && !flagged.some((f) => sameValue(f, c.value)))
+              .filter((c) => c.subject && c.attribute && c.value)
+              // A price no source backed is still worth re-checking, but it is stored as unverified, so
+              // a later table says "then: $14 (unverified)" instead of presenting it as a sourced fact.
+              .map((c) => (flagged.some((f) => sameValue(f, c.value)) && !/unverified/i.test(c.value) ? { ...c, value: `${c.value} (unverified)`, sourceUrl: null, sourceDate: null } : c))
               .map((c) => canonicalSubject(c, subjects)),
             MAX_STORED_CLAIMS,
             MAX_CLAIMS_PER_SUBJECT,
@@ -467,4 +477,12 @@ async function* drain<T>(p: Promise<T>, updates: Updates): AsyncGenerator<AgentE
   }
   for (const e of updates.take()) yield e;
   return await p;
+}
+
+/** "2 unchanged, 1 couldn't verify" for rows left out of a short table. */
+function countBy(rows: Array<{ status: string }>): string {
+  const n = (st: string) => rows.filter((r) => r.status === st).length;
+  return [n("unchanged") ? `${n("unchanged")} unchanged` : "", n("unverified") ? `${n("unverified")} couldn't verify` : "", n("changed") ? `${n("changed")} more changed` : ""]
+    .filter(Boolean)
+    .join(", ");
 }

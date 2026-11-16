@@ -111,7 +111,8 @@ export function renderDiffTable(rows: DiffRow[], thenLabel: string, nowLabel: st
 
 // ---- Money guard: every price in an answer must appear in what the model was shown.
 
-const MONEY_RE = /(?:[$€£₹]\s?\d[\d,]*(?:\.\d+)?(?:\s?[km]\b)?|\b\d[\d,]*(?:\.\d+)?\s?(?:USD|EUR|GBP|INR)\b)/gi;
+// Thousands separators only between digit groups, so "$50, then" is "$50" (live: "$50," was flagged).
+const MONEY_RE = /(?:[$€£₹]\s?\d{1,3}(?:,\d{3})*(?:\.\d+)?(?!\d)(?:\s?[km]\b)?|[$€£₹]\s?\d+(?:\.\d+)?(?:\s?[km]\b)?|\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\s?(?:USD|EUR|GBP|INR)\b|\b\d+(?:\.\d+)?\s?(?:USD|EUR|GBP|INR)\b)/gi;
 
 export function moneyIn(text: string): string[] {
   return [...new Set(text.match(MONEY_RE) ?? [])].map((s) => s.trim());
@@ -122,6 +123,8 @@ interface PriceMention {
   amount: number;
   currency: string | null;
   context: Set<string>; // words naming what the price belongs to ("neon", "launch")
+  /** Stated as a past value ("was $19", "$19 then"). */
+  past: boolean;
 }
 
 const CONTEXT_STOP = new Set(
@@ -134,12 +137,21 @@ function contextWords(s: string): Set<string> {
       .toLowerCase()
       .replace(/\[\d+\]|https?:\/\/\S+/g, " ")
       .split(/[^a-z0-9]+/)
-      .filter((w) => w.length >= 3 && !CONTEXT_STOP.has(w) && !/^\d+$/.test(w)),
+      .filter((w) => w.length >= 3 && !CONTEXT_STOP.has(w) && !/^\d+$/.test(w))
+      .map(stem),
   );
 }
 
+/** "requests" = "request", "tiers" = "tier": the answer and the page rarely use the same plural. */
+function stem(w: string): string {
+  if (w.length > 4 && w.endsWith("ies")) return `${w.slice(0, -3)}y`;
+  if (w.length > 3 && w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
+  return w;
+}
+
 /** Each price with the words just before it on the same line, back to the previous price. */
-function priceMentions(text: string): PriceMention[] {
+/** `withAfter`: for evidence, also the words after the price up to the next one ("$0.30 per million requests"). */
+function priceMentions(text: string, withAfter = false): PriceMention[] {
   const out: PriceMention[] = [];
   for (const line of text.split(/\n|(?<=[.!?])\s+/)) {
     let from = 0;
@@ -147,8 +159,16 @@ function priceMentions(text: string): PriceMention[] {
       const v = parseValue(m[0]);
       if (v.amount === null) continue;
       // For table rows the whole row is the context (the subject sits in the first cell).
-      const context = line.trimStart().startsWith("|") ? line : line.slice(from, m.index);
-      out.push({ text: m[0].trim(), amount: v.amount, currency: v.currency, context: contextWords(context) });
+      let context = line.trimStart().startsWith("|") ? line : line.slice(from, m.index);
+      if (withAfter && !line.trimStart().startsWith("|")) {
+        const rest = line.slice(m.index! + m[0].length);
+        const next = rest.search(new RegExp(MONEY_RE.source, "i"));
+        context += ` ${(next < 0 ? rest : rest.slice(0, next)).split(/\s+/).slice(0, 6).join(" ")}`;
+      }
+      const before = line.slice(Math.max(0, m.index! - 40), m.index);
+      const after = line.slice(m.index! + m[0].length, m.index! + m[0].length + 40);
+      const past = PAST_BEFORE.test(before) || PAST_AFTER.test(after);
+      out.push({ text: m[0].trim(), amount: v.amount, currency: v.currency, context: contextWords(context), past });
       from = m.index! + m[0].length;
     }
   }
@@ -159,7 +179,16 @@ function priceMentions(text: string): PriceMention[] {
 export interface EvidenceDoc {
   text: string;
   about?: string;
+  /**
+   * Evidence for what WAS true (an earlier answer, earlier in this chat): it supports a price only when
+   * the sentence states it as past ("was $19", "$19 then", "down from $19"), never as today's price.
+   */
+  pastOnly?: boolean;
 }
+
+// Words right before a price that make it a past value, or "then" right after it.
+const PAST_BEFORE = /\b(?:was|were|had been|used to be|previously|from|then|earlier|before)\s*(?:at\s+)?$/i;
+const PAST_AFTER = /^\s*(?:[^\s$€£₹\d]+\s+){0,3}?(?:then|before|earlier|previously)\b/i;
 
 /** Plain numbers that may multiply a sourced unit price into a total (seats, months). */
 function multipliersIn(s: string): number[] {
@@ -183,10 +212,11 @@ export function priceChecker(evidence: string | EvidenceDoc[], opts: { multiplie
   const docs = typeof evidence === "string" ? [{ text: evidence }] : evidence;
   const known = docs.flatMap((d) => {
     const about = contextWords(d.about ?? "");
-    return priceMentions(d.text).map((k) => ({ ...k, context: new Set([...k.context, ...about]) }));
+    return priceMentions(d.text, true).map((k) => ({ ...k, context: new Set([...k.context, ...about]), pastOnly: !!d.pastOnly }));
   });
   const supported = (p: PriceMention) =>
     known.some((k) => {
+      if (k.pastOnly && !p.past) return false;
       if (Math.abs(k.amount - p.amount) >= 0.005) return false;
       if (p.currency && k.currency && p.currency !== k.currency) return false;
       if (p.context.size === 0) return true; // "That's $19." refers back; nothing more to compare

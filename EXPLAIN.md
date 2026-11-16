@@ -98,6 +98,13 @@ The offline tests passed 48/48, but the fakes were kinder than the real models. 
 The fakes now behave like the live models (slow router, ignores notes, paraphrases, searches when it can), and
 `test/livegaps.test.ts` has a test per gap.
 
+**Second live run (30 of 36).** Three more causes, fixed: (a) search snippets often lacked the price (citations are
+fragments), so the search model's quoted bullet per URL is now kept too, and "$50," / plurals / "was $19" are read
+correctly; (b) a CRM whose prices were all unverified was dropped from memory, so it was never re-checked: it is now
+kept, marked "(unverified)", and short names ("Zoho") are filed as "Zoho CRM"; (c) a nudge re-checked only 2 facts
+per subject, the rest stayed due and the next chat searched again: now every fact of a checked subject is checked
+(same search), and only the table is capped.
+
 **Interview lines:** "Why did offline pass and live fail?" Because the fake models were too cooperative; I made the
 fakes as unhelpful as the real ones and added a test per live failure. "Where does grounding live?" In code: a
 streaming guard, not a prompt rule. "Who decides what to search?" The agent, in code; models only fill gaps.

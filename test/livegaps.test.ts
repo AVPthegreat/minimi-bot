@@ -11,6 +11,7 @@ import { GroundingGuard } from "../src/grounding.ts";
 import { FakeLLM } from "../src/llm/fake.ts";
 import type { AnswerEvent, AnswerInput } from "../src/llm/types.ts";
 import { canonicalSubject, fairCap, planSubjects, subjectQueries } from "../src/planner.ts";
+import { AnthropicWebSearch } from "../src/search/anthropic.ts";
 import { FakeSearch } from "../src/search/fake.ts";
 import type { SearchProvider } from "../src/search/types.ts";
 import { FakeClock } from "../src/time.ts";
@@ -99,7 +100,7 @@ test("grounding: a source title names the product; a shown total of a sourced pr
   assert.deepEqual(unsupportedPrices("Zoho CRM Standard is $14 [2], so $300 per month.", crm, { multipliers: [20] }), ["$300"]);
 });
 
-test("an answer model that invents a price: shown as unverified, warned, and never tracked as a fact", async () => {
+test("an answer model that invents a price: shown as unverified, warned, and tracked only as unverified", async () => {
   const clock = new FakeClock("2026-11-10T10:00:00+05:30");
   const llm = new FakeLLM(undefined, { slowRouter: true });
   llm.streamAnswer = async function* (): AsyncIterable<AnswerEvent> {
@@ -119,7 +120,7 @@ test("an answer model that invents a price: shown as unverified, warned, and nev
   assert.match(text, /\$19 per month \[2\]/);
   assert.ok(events.some((e) => e.type === "warning" && e.text.includes("$700")));
   const values = (store.db.prepare("SELECT value FROM claims").all() as Array<{ value: string }>).map((r) => r.value);
-  assert.deepEqual(values, ["$19"]);
+  assert.deepEqual(values, ["$19", "$700 (unverified)"]);
 });
 
 // ---- 2. The user sees honest progress at once, then the answer as it is written.
@@ -200,4 +201,75 @@ test("'anything new?' re-checks at most 3 subjects and 2 facts per subject", asy
   assert.ok(new Set(rows.map((l) => l.slice(2).split(":")[0])).size <= 3, "at most 3 subjects");
   assert.ok(rows.length <= 6, "at most 2 facts per subject");
   assert.ok(log.length <= 6, "one re-check + one news search per subject");
+});
+
+// ---- Live run 2 (16 Nov, 30/36): the causes found in its results.
+
+test("run 2: '$50,' is the price $50; plurals match; old prices count only when stated as past", () => {
+  assert.deepEqual(unsupportedPrices("Neon Scale is $50, Launch is $19.", "Neon: Scale $50 and Launch $19."), []);
+  const page = [{ text: "Workers: $0.30 per million request.", about: "Cloudflare Workers pricing" }];
+  assert.deepEqual(unsupportedPrices("Extra requests cost $0.30 per million [1].", page), []);
+  const old = [{ text: "Supabase: the Team plan costs $599 per month.", pastOnly: true }];
+  assert.deepEqual(unsupportedPrices("Supabase Team was $599 per month on Tue 10 Nov.", old), []);
+  assert.deepEqual(unsupportedPrices("Supabase Team: $599 per month then, unchanged now.", old), []);
+  assert.deepEqual(unsupportedPrices("Supabase Team is $599 per month.", old), ["$599"], "an old answer never backs today's price");
+});
+
+test("run 2: the search model's quoted bullet (with the price) becomes the result's snippet", async () => {
+  const client = {
+    messages: {
+      create: async () => ({
+        stop_reason: "end_turn",
+        usage: { input_tokens: 10, output_tokens: 10 },
+        content: [
+          { type: "server_tool_use", id: "t1", name: "web_search", input: { query: "Railway pricing" } },
+          { type: "web_search_tool_result", tool_use_id: "t1", content: [{ type: "web_search_result", url: "https://railway.com/pricing", title: "Pricing | Railway", page_age: null, encrypted_content: "x" }] },
+          // The citation is a fragment without the price; the bullet keeps plan, price and unit together.
+          { type: "text", text: '- "Hobby plan: $5/month, includes $5 of usage"', citations: [{ type: "web_search_result_location", url: "https://railway.com/pricing", title: "Pricing | Railway", cited_text: "Hobby plan", encrypted_index: "z" }] },
+          { type: "text", text: '\n- "Pro plan: $20/seat/month" <https://railway.com/pricing>\n- "Made up: $1" <https://elsewhere.example/>' },
+        ],
+      }),
+    },
+  };
+  const [r] = await new AnthropicWebSearch(client as never, "claude-haiku-5-5").search("Railway pricing");
+  assert.match(r!.snippet, /Hobby plan: \$5\/month/);
+  assert.match(r!.snippet, /Pro plan: \$20\/seat\/month/);
+  assert.doesNotMatch(r!.snippet, /Made up/);
+  assert.deepEqual(unsupportedPrices("Railway Hobby is $5 per month [1].", [{ text: r!.snippet, about: r!.title }]), []);
+});
+
+test("run 2: a tool whose prices were all unverified is still tracked (as unverified) and re-checked; short names are filed under the searched name", async () => {
+  const llm = new FakeLLM(undefined, { slowRouter: true });
+  const base = llm.streamAnswer.bind(llm);
+  llm.streamAnswer = async function* (input: AnswerInput): AsyncIterable<AnswerEvent> {
+    yield* base(input);
+    if (input.intent === "search") yield { type: "text", text: "\n- Zoho's Enterprise tier is $52 per user per month.\n" };
+  };
+  llm.extractClaims = async () => [
+    ...["HubSpot", "Pipedrive", "Salesforce", "Close"].map((subject) => ({ subject, attribute: "Starter plan price", value: "$20", unit: "per seat per month", sourceUrl: null, sourceDate: null })),
+    { subject: "Zoho", attribute: "Enterprise plan price", value: "$52", unit: "per user per month", sourceUrl: null, sourceDate: null },
+  ];
+  const { clock, store, agent } = setup(llm);
+  await run(agent, agent.newSession().id, "We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing.");
+  const zoho = store.db.prepare("SELECT subject, value FROM claims WHERE subject LIKE 'Zoho%'").get() as { subject: string; value: string };
+  assert.deepEqual({ ...zoho }, { subject: "Zoho CRM", value: "$52 (unverified)" });
+  clock.set("2026-11-12T15:00:00+05:30");
+  const { text } = await run(agent, agent.newSession().id, "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?");
+  for (const t of ["HubSpot", "Pipedrive", "Salesforce", "Zoho CRM", "Close"]) assert.ok(text.includes(`| ${t}:`), `${t} re-checked`);
+  assert.match(text, /\| Zoho CRM: Enterprise plan price \| \$52 \(unverified\) per user per month \|/);
+});
+
+test("run 2: after a nudge checked the watchlist, the next new chat runs no searches (subjects with many facts)", async () => {
+  const { clock, store, agent, log } = setup();
+  const sid = agent.newSession().id;
+  store.addClaims(null, sid, ["Supabase", "Neon", "Railway"].flatMap((s) => ["Free", "Launch", "Pro", "Team"].map((p) => ({
+    subject: s, attribute: `${p} plan price`, value: "$1", unit: "per month", sourceUrl: null, sourceDate: null,
+  }))), clock.now());
+  clock.set("2026-11-16T09:00:00+05:30");
+  await agent.nudge(agent.newSession().id);
+  assert.ok(log.length > 0 && log.length <= 3, "one search per subject");
+  clock.set("2026-11-16T09:30:00+05:30");
+  log.length = 0;
+  assert.equal(await agent.nudge(agent.newSession().id), null);
+  assert.equal(log.length, 0, "every fact of a checked subject was marked checked");
 });

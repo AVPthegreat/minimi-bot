@@ -31,12 +31,13 @@ missed its 1.5 s cap, the plan collapsed to one query, and Opus searched on its 
 **Getting it right.** Official and recent pages rank first. Grounding is enforced in code while the answer streams:
 a sentence or table row with a price is held until complete and checked against the gathered sources (amount,
 currency, the product it belongs to, the source's title); a total is accepted only as a sourced price times a number
-the user gave ("20 seats x $14 [2] = $280"). An unsupported price is shown as "$X (unverified)", warned about, and
-never stored as a fact. How a date was read, the quoted earlier question and the then/now table are rendered by code,
+the user gave ("20 seats x $14 [2] = $280"); an earlier answer backs a price only when stated as past ("was $19").
+Snippets are the search model's verbatim citations plus its quoted bullets for URLs it returned. An unsupported
+price is shown as "$X (unverified)", warned about, and tracked only as unverified, so the next re-check settles it. How a date was read, the quoted earlier question and the then/now table are rendered by code,
 so they never depend on the model's wording; the summary never claims "nothing changed" unless every fact was verified.
 
 **The right moment** (minimi's idea). Stated facts are a watchlist. A new chat quietly re-checks up to 3 subjects
-(2 facts each, bounded in code, as is "anything new?") older than 3 days. If one changed, the chat opens with one
+(all their facts share one search each) older than 3 days; "anything new?" shows at most 6 rows, changes first. If one changed, the chat opens with one
 line; if not, silence. Never twice, dropped if you start typing first, can be turned off (`WATCH_ENABLED`).
 
 | Decision | Why | Rejected |

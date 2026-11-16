@@ -10,7 +10,9 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { UsageMeter } from "../usage.ts";
 import type { SearchOptions, SearchProvider, SearchResult } from "./types.ts";
 
-const SYSTEM = `You are a search backend, not an assistant. Run exactly one web_search with the query text as given. Then write short bullet points that quote the most relevant lines from the results verbatim: prices with their plan names and units, version numbers, dates, announcements. Every bullet must be a quotation from a result. No commentary, no advice.`;
+const SYSTEM = `You are a search backend, not an assistant. Run exactly one web_search with the query text as given. Then write one bullet per relevant fact, quoting the result verbatim, with the product, plan name, price and unit together in the same bullet, and end the bullet with the result's URL in angle brackets:
+- "Neon Launch plan: $19/month" <https://neon.com/pricing>
+Cover prices, plan names, version numbers, dates and announcements. Every bullet must be a quotation from a result. No commentary, no advice.`;
 
 export class AnthropicWebSearch implements SearchProvider {
   readonly name = "anthropic-web-search";
@@ -52,13 +54,29 @@ export class AnthropicWebSearch implements SearchProvider {
       }
     }
     if (errors && byUrl.size === 0) throw new Error("web_search failed");
-    for (const block of res.content) {
-      if (block.type !== "text" || !block.citations) continue;
-      for (const c of block.citations) {
-        if (c.type !== "web_search_result_location") continue;
-        const r = byUrl.get(c.url);
-        if (r && !r.snippet.includes(c.cited_text)) r.snippet = `${r.snippet} ${c.cited_text}`.trim().slice(0, 1500);
+    // Snippets: the verbatim `cited_text` of each citation, plus the search model's quoted bullets for a
+    // URL it found (a citation's text is often a fragment without the price; the bullet keeps product,
+    // plan, price and unit together). A bullet naming a URL the search did not return is ignored.
+    const add = (r: SearchResult | undefined, t: string) => {
+      const clean = t.replace(/<https?:\/\/[^>]*>|https?:\/\/\S+/g, "").replace(/^\s*[-*]\s*/, "").trim();
+      if (r && clean && !r.snippet.includes(clean)) r.snippet = `${r.snippet} ${clean}`.trim().slice(0, 1500);
+    };
+    const findUrl = (t: string) => {
+      for (const m of t.matchAll(/https?:\/\/[^\s>)"]+/g)) {
+        const u = m[0].replace(/[.,;]+$/, "");
+        const hit = byUrl.get(u) ?? [...byUrl.values()].find((r) => r.url.replace(/\/$/, "") === u.replace(/\/$/, ""));
+        if (hit) return hit;
       }
+      return undefined;
+    };
+    for (const block of res.content) {
+      if (block.type !== "text") continue;
+      for (const c of block.citations ?? []) {
+        if (c.type !== "web_search_result_location") continue;
+        add(byUrl.get(c.url), c.cited_text);
+        if (/[$€£₹]\s?\d|\d\s?(?:USD|EUR|GBP|INR)\b/.test(block.text)) add(byUrl.get(c.url), block.text);
+      }
+      for (const line of block.text.split("\n")) add(findUrl(line), line);
     }
     // Quoted results first (they have text the answer model can cite), then title-only ones.
     const all = [...byUrl.values()];

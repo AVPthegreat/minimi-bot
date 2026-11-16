@@ -107,6 +107,9 @@ function writeResults(reports: StepReport[]): string {
       searches: r.result.searches,
       failedChecks: r.checks.filter((c) => !c.pass).map((c) => c.name),
       warnings: r.result.warnings,
+      // The answer and its sources, so a failed live check can be diagnosed line by line.
+      text: r.result.text,
+      sources: r.result.sources,
     })),
   };
   const dir = new URL("./results/", import.meta.url);
