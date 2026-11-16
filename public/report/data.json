@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-16T13:10:06.947Z",
+  "generatedAt": "2026-11-16T13:25:04.508Z",
   "note": "Built by npm run report from eval/live-reports (live runs with the real models) and an offline run of npm run eval and npm test.",
   "totals": {
     "liveRuns": 4,
@@ -28,7 +28,7 @@
   },
   "offline": {
     "eval": {
-      "passed": 133,
+      "passed": 139,
       "failed": 0,
       "scenarios": 12
     },
@@ -36,7 +36,7 @@
       "total": 142,
       "passed": 142
     },
-    "measuredAt": "2026-11-16T13:10:06.947Z"
+    "measuredAt": "2026-11-16T13:25:04.507Z"
   },
   "latency": {
     "run": 4,

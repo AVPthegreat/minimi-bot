@@ -258,6 +258,9 @@ Key choices:
   prices against it and it is cited `[n]` like the rest. Bounds: `ANSWER_MAX_SEARCHES` (default 3, max 5) searches
   per turn, so at most 4 model calls; calls over the budget get a "budget used up" result and the last call has the
   tool switched off; the spend cap is checked before every search round. Chat and recall get no tool.
+  Code tells the model which named products the planned round already priced (`<coverage>`); it searches again only
+  for a gap, and when every product is covered at most 1 follow-up is allowed (live run 5: unneeded follow-ups had
+  pushed first text on comparisons from ~13 s to 30-36 s).
 
 ### 6.3 Verify: "is that still correct?"
 

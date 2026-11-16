@@ -112,7 +112,7 @@ One turn step by step (steps 1-3 and 9-16 are `Agent.chat`; 4-7 `routeTurn`; 8 t
      `rankSources(runs, subjects or router queries, now, max(8, 2 × subjects + 2), {coverEachQuery: subjects.length > 0})`.
 9. If every run failed: `warning` and (for search) a note "do not state current facts". Log every run with
    `store.logSearch`. Emit `sources`.
-10. The tool budget: `ANSWER_MAX_SEARCHES` (default 3) when the handler is `web` (search, verify, updates), else 0
+10. The tool budget: `ANSWER_MAX_SEARCHES` (default 3; 1 when every named product already has a priced source) when the handler is `web` (search, verify, updates), else 0
     (chat and recall never search). A non-integer bound counts as 0.
 11. Build the guard: `new GroundingGuard((line, before) => priceChecker(evidence(), {multipliers, names: names()})(line, shown + before))`.
     `evidence()` is recomputed per line (sources can grow during the stream): every source (`text` = title +
@@ -129,6 +129,9 @@ One turn step by step (steps 1-3 and 9-16 are `Agent.chat`; 4-7 `routeTurn`; 8 t
     turn is used up`. Each run is ranked (`rankSources`) and its pages appended to `turn.sources` with the next
     numbers (a URL already there keeps its number); emit `sources`; push the `ToolRound {text, calls, results,
     state}` and loop. `used` grows by at least 1 per round, so the loop makes at most `budget + 1` model calls.
+    Before round 1, code computes `coverageOf(subjects, planned sources)`: per named product, the sources that name
+    it with a price. It goes to the model as `<coverage>` ("Neon: priced in [2]" / "Close: NO priced source"); when
+    every product is covered the budget is capped at 1. The `done` event reports `loop {selfSearches, covered}`.
     On an exception (not an abort): a short failure line through the guard and an `error` event with
     `publicError(e)` or the message.
 13. `guard.end()` releases the held tail. Log the loop's searches (`self-search`). Emit one `warning` per flagged price.
@@ -796,7 +799,7 @@ No framework and no build step: `public/index.html` loads `js/main.js` as an ES 
 ## 8. Test map
 
 `npm test` runs `node --test test/*.test.ts` (142 tests, all passing; `npm run report` records the count in `public/report/data.json` and flags a stale README). `npm run eval` runs the same
-scenarios with a readable report (131 checks).
+scenarios with a readable report (139 checks; `EVAL_ONLY=a,b` limits it to those scenarios).
 
 | File | Covers |
 |---|---|
