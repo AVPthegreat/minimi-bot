@@ -155,24 +155,67 @@ function priceMentions(text: string): PriceMention[] {
   return out;
 }
 
+/** A piece of current evidence: its text, plus words naming what it is about (a source's title and query). */
+export interface EvidenceDoc {
+  text: string;
+  about?: string;
+}
+
+/** Plain numbers that may multiply a sourced unit price into a total (seats, months). */
+function multipliersIn(s: string): number[] {
+  const out: number[] = [];
+  for (const m of s.replace(MONEY_RE, " ").matchAll(/\b(\d{1,6})(?:[- ](?:person|people|seats?|users?|members?|months?))?\b/gi)) {
+    const n = Number(m[1]);
+    if (n >= 2 && n <= 100000) out.push(n);
+  }
+  return out;
+}
+
 /**
- * Prices in `answer` that no piece of `evidence` supports. A price is supported when the evidence has
- * the same amount, in the same currency, said about the same thing (the words before the price share a
- * product or plan name). "Neon Launch $19" is not supported by "Supabase Pro $19". Callers pass only
- * current evidence (fresh sources and the computed diff table), so a stale price copied from an old
- * answer is flagged.
+ * Checks prices against current evidence. A price is supported when the evidence has the same amount,
+ * in the same currency, said about the same thing (the words before the price, or the source's title,
+ * share a product or plan name): "Neon Launch $19" is not supported by "Supabase Pro $19". A total is
+ * supported when it is a supported price on the same line times a number the user or the line gave
+ * ("20 seats x $14 [2] = $280"). Callers pass only current evidence (fresh sources and the computed
+ * diff table), so a stale price copied from an old answer is not supported.
  */
-export function unsupportedPrices(answer: string, evidence: string): string[] {
-  const known = priceMentions(evidence);
-  const bad = priceMentions(answer).filter((p) => {
-    return !known.some((k) => {
+export function priceChecker(evidence: string | EvidenceDoc[], opts: { multipliers?: number[] } = {}): (line: string) => string[] {
+  const docs = typeof evidence === "string" ? [{ text: evidence }] : evidence;
+  const known = docs.flatMap((d) => {
+    const about = contextWords(d.about ?? "");
+    return priceMentions(d.text).map((k) => ({ ...k, context: new Set([...k.context, ...about]) }));
+  });
+  const supported = (p: PriceMention) =>
+    known.some((k) => {
       if (Math.abs(k.amount - p.amount) >= 0.005) return false;
       if (p.currency && k.currency && p.currency !== k.currency) return false;
       if (p.context.size === 0) return true; // "That's $19." refers back; nothing more to compare
       return [...p.context].some((w) => k.context.has(w));
     });
-  });
-  return [...new Set(bad.map((p) => p.text))];
+  return (text: string) => {
+    const bad: string[] = [];
+    for (const line of text.split("\n")) {
+      const mentions = priceMentions(line);
+      const ok = mentions.filter(supported);
+      const factors = [...multipliersIn(line), ...(opts.multipliers ?? []), 12];
+      for (const p of mentions) {
+        if (ok.includes(p)) continue;
+        const derived = ok.some((k) => k !== p && factors.some((n) => Math.abs(k.amount * n - p.amount) <= 0.005 * Math.max(1, p.amount)));
+        if (!derived) bad.push(p.text);
+      }
+    }
+    return [...new Set(bad)];
+  };
+}
+
+/** Prices in `answer` that no piece of `evidence` supports (see `priceChecker`). */
+export function unsupportedPrices(answer: string, evidence: string | EvidenceDoc[], opts: { multipliers?: number[] } = {}): string[] {
+  return priceChecker(evidence, opts)(answer);
+}
+
+/** Numbers in the user's question that may multiply a price (team size, months). */
+export function questionMultipliers(question: string): number[] {
+  return multipliersIn(question);
 }
 
 /** One honest summary line for a re-check: never "nothing changed" unless every row was verified. */
