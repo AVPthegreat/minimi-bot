@@ -59,6 +59,18 @@ question at once, the then/now table when the re-check ends. Search answers: Opu
 slowest search (Tavily ≈1 s; Anthropic search ≈3-8 s), then tokens as they arrive (a price line waits for its end).
 Live 16 Nov, before this change: 16-37 s to the first word on search turns.
 
+**Web UI** (`public/`, plain ES modules, no framework or build step). `api.js` owns fetch, the SSE parser and typed
+errors; `state.js` is one observable store; `chat.js` turns stream events into view calls (busy, stop, retry);
+`render/*` only draw (messages, search steps, sources, sidebar, home, composer, banner); `markdown.js` escapes every
+character before adding its own tags. The stream carries typed `search` events (query, running/done/failed/cancelled,
+result count, the product's site) next to the old status lines, so older clients still work. Logos come from our own
+`GET /api/logo` (`src/logo.ts`): fetched server-side over https from public addresses only (checked at connect time),
+sniffed as raster images, size/time capped, cached in memory and on disk, a letter tile otherwise. The look follows
+minimi's own site: a white app window on a warm dune backdrop, near-black text, black buttons, pill chips, sources as
+app-panel items (site · date, bold title, grey quote line), one orange accent; dark is near-black with a faint purple glow.
+Text tokens pass WCAG AA on their surfaces (ratios in `public/css/tokens.css`); the window turns solid under
+`prefers-reduced-transparency`. The Report page (`/report`) draws `public/report/data.json`, built by `npm run report`.
+
 **Eval.** `eval/scenarios.ts` replays multi-day conversations on a fake clock against a fixture web whose prices
 change on known dates: the three example questions, nudges, time phrases (late night IST, "the 3rd", "yesterday
 evening"), same-day recall, small talk vs. a new question, rupees, contradicting sources, team totals, prompt

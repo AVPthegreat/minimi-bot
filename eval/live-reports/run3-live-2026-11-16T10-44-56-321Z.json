@@ -1,0 +1,1032 @@
+{
+  "mode": "live",
+  "at": "2026-11-16T10:44:56.321Z",
+  "models": {
+    "answer": "claude-opus-5-5",
+    "fast": "claude-haiku-5-5",
+    "search": "anthropic",
+    "searchModel": "claude-haiku-5-5"
+  },
+  "checks": {
+    "passed": 33,
+    "failed": 3
+  },
+  "spendUsd": 0.9645,
+  "spend": "$0.9645 over 80 calls, 49 web searches (claude-haiku-5-5: 760586 in / 84558 out / 0 cache-read; claude-opus-5-5: 22673 in / 13063 out / 10517 cache-read)",
+  "latency": [
+    {
+      "intent": "search",
+      "turns": 6,
+      "firstStatusP50": 1,
+      "firstModelTokenP50": 13467,
+      "firstModelTokenP95": 23619,
+      "firstTokenP50": 13467,
+      "firstTokenP95": 23619,
+      "totalP50": 20097,
+      "totalP95": 35379,
+      "searchesAvg": 3.3
+    },
+    {
+      "intent": "verify",
+      "turns": 4,
+      "firstStatusP50": 1,
+      "firstModelTokenP50": 16415,
+      "firstModelTokenP95": 27481,
+      "firstTokenP50": 1,
+      "firstTokenP95": 4,
+      "totalP50": 20068,
+      "totalP95": 35037,
+      "searchesAvg": 5
+    },
+    {
+      "intent": "recall",
+      "turns": 1,
+      "firstStatusP50": null,
+      "firstModelTokenP50": 1612,
+      "firstModelTokenP95": 1612,
+      "firstTokenP50": 1,
+      "firstTokenP95": 1,
+      "totalP50": 2717,
+      "totalP95": 2717,
+      "searchesAvg": 0
+    },
+    {
+      "intent": "chat",
+      "turns": 1,
+      "firstStatusP50": null,
+      "firstModelTokenP50": 865,
+      "firstModelTokenP95": 865,
+      "firstTokenP50": 865,
+      "firstTokenP95": 865,
+      "totalP50": 1308,
+      "totalP95": 1308,
+      "searchesAvg": 0
+    },
+    {
+      "intent": "updates",
+      "turns": 1,
+      "firstStatusP50": 1,
+      "firstModelTokenP50": 17865,
+      "firstModelTokenP95": 17865,
+      "firstTokenP50": 11870,
+      "firstTokenP95": 11870,
+      "totalP50": 21220,
+      "totalP95": 21220,
+      "searchesAvg": 6
+    }
+  ],
+  "steps": [
+    {
+      "scenario": "postgres-last-tuesday",
+      "step": 1,
+      "say": "What does Postgres hosting cost on Supabase, Neon and Railway?",
+      "intent": "search",
+      "firstStatusMs": 40,
+      "firstTokenMs": 13839,
+      "firstModelTokenMs": 13839,
+      "totalMs": 20097,
+      "searches": 4,
+      "failedChecks": [],
+      "warnings": [],
+      "text": "**Supabase's paid plan is $25/month per organization plus usage overages [4]. Neon's free plan costs $0 [3], and its typical spend is about $15/month [6]. Railway runs on plans from $0 to $20/month plus usage-based compute [1][2].** I read the question as asking for the entry-level free and paid plans for a single Postgres database.\n\n| Provider | Free tier | Paid entry plan | Usage charges |\n|---|---|---|---|\n| Supabase | 2 projects, 500 MB each [7] | Pro $25/month per organization + overages [4] | Overage rates are not in my sources |\n| Neon | $0 for up to 100 projects that never expire [3] | Typical spend about $15/month [6][8]; list plan prices are not in my sources | Not in my sources |\n| Railway | Free $0/month with $1 of monthly credits [1]; Free Trial with $5 in credits for 30 days [1] | Hobby $5/month incl. $5 credits [1]; Pro $20/month per workspace incl. $20 credits [1] | RAM $10/GB/month [2]; CPU $20/vCPU/month [2]; egress $0.05/GB [2] |\n\n**Caveats (high stakes):**\n- **None of these sources has a date**, so I can't confirm the prices are current as of today (10 Nov 2026).\n- **Supabase's $25 Pro price is single-sourced** from a third-party blog [4], and the free-tier limits come from another third-party page [7]. Verify both at supabase.com/pricing.\n- **Neon's \"$15/month\" is a typical spend, not a plan price** [6][8]. The sources don't show Neon's paid plan rates, so check neon.com/pricing.\n- **Railway is the best-supported.** Its plan prices come from its official pricing page [1] and docs [2], and a third party agrees on the CPU and RAM rates [5]. Railway bills per second for the CPU, memory and disk you actually use [1]. A Postgres instance's real cost therefore depends on its resource usage beyond the included credits.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "--- title: Railway Pricing",
+          "url": "https://railway.com/pricing.md",
+          "domain": "railway.com",
+          "official": true
+        },
+        {
+          "n": 2,
+          "title": "Pricing Plans",
+          "url": "https://docs.railway.com/pricing/plans",
+          "domain": "docs.railway.com",
+          "official": true
+        },
+        {
+          "n": 3,
+          "title": "Cheapest Postgres hosting for developers (2026) - Neon Guides",
+          "url": "https://neon.com/guides/cheapest-postgres-hosting-developers-2026",
+          "domain": "neon.com",
+          "official": true
+        },
+        {
+          "n": 4,
+          "title": "Supabase Pricing: 2026 Guide to Plans, Limits, and Real-World Costs",
+          "url": "https://www.jetadmin.io/blog/supabase-pricing-2026-guide-to-plans-limits-and-real-world-costs/",
+          "domain": "jetadmin.io",
+          "official": false
+        },
+        {
+          "n": 5,
+          "title": "Railway Pricing 2026: Plans, Usage Rates and Costs",
+          "url": "https://www.activepieces.com/blog/railway-pricing-2026-plans-usage-rates-and-costs",
+          "domain": "activepieces.com",
+          "official": false
+        },
+        {
+          "n": 6,
+          "title": "Neon Pricing: Free Plan With 100 Projects, Typical Spend $15/Month",
+          "url": "https://neon.com/pricing",
+          "domain": "neon.com",
+          "official": true
+        },
+        {
+          "n": 7,
+          "title": "PostgreSQL and SQLite hosting: free and paid options",
+          "url": "https://flaviocopes.com/database-hosting-options/",
+          "domain": "flaviocopes.com",
+          "official": false
+        },
+        {
+          "n": 8,
+          "title": "10 Best Managed Postgres Providers Compared (2026)",
+          "url": "https://dreamlit.ai/blog/top-10-managed-postgres-providers",
+          "domain": "dreamlit.ai",
+          "official": false
+        }
+      ]
+    },
+    {
+      "scenario": "postgres-last-tuesday",
+      "step": 2,
+      "say": "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?",
+      "intent": "verify",
+      "firstStatusMs": 5,
+      "firstTokenMs": 4,
+      "firstModelTokenMs": 18436,
+      "totalMs": 24141,
+      "searches": 6,
+      "failedChecks": [
+        "every price is backed by a source"
+      ],
+      "warnings": [
+        "I couldn't match $25 to a current source. Treat it as unverified."
+      ],
+      "text": "**Last Tuesday = Tue 10 Nov.** \"Last Tuesday\" could mean Tue 17 Nov or Tue 10 Nov. You asked about this on Tue 10 Nov, so I used that day.\n\nYou asked on Tue 10 Nov, 10:00: \"What does Postgres hosting cost on Supabase, Neon and Railway?\"\n\nSince Tue 10 Nov: **3 changed**, 3 unchanged, 1 I couldn't verify.\n\n| What | Then (Tue 10 Nov) | Now (Wed 18 Nov) | Status |\n|---|---|---|---|\n| Supabase: Pro plan price | $25 per month per organization | $25 per organization per month [8] | **Changed** |\n| Supabase: free tier projects | 2 projects, 500 MB each | 2 projects, 500 MB database each [8] | **Changed** |\n| Neon: free plan price | $0 | $0 per month [1] | Unchanged |\n| Neon: typical monthly spend | $15 per month | not found | Couldn't verify |\n| Railway: Hobby plan price | $5 per month | $5 per month [2] | Unchanged |\n| Railway: Pro plan price | $20 per month per workspace | $20 per month [2] | **Changed** |\n| Railway: RAM price | $10 per GB per month | $10 per GB per month [2] | Unchanged |\n\n**None of the numbers have changed. The three rows marked \"Changed\" use different wording in the sources, but the prices and limits are the same.** Supabase Pro is still $25 per organization per month, and the free tier still allows two projects at 500 MB each [8]. The Railway Pro row is also still $20/month [2]. That source just doesn't say \"per workspace\" this time. Neon's free plan ($0 [1]), Railway Hobby ($5/month [2]) and Railway RAM ($10/GB/month [2]) are unchanged. I couldn't re-verify Neon's ~$15/month typical spend.\n\n**New since last time:**\n- **Neon paid rate:** Paid plans have no monthly fee. Compute on the Launch plan costs $0.106 per CU-hour [12]. Neon has also published a post about its newer usage-based, no-minimum pricing [4]. The $0.106 rate comes from a third-party blog only, so it is **single-sourced**. A third-party page also says the Free plan includes 0.5 GB storage and 100 CU-hours [10].\n- **Supabase sources disagree on the Pro unit:**\n  - One says $25 (unverified)/month \"per project\" [5]; another says $25 \"per organization\" [8].\n  - Another says Pro includes $10 in compute credits [7].\n  - The Team plan starts from $599/month [9], but only one source shows this, so it is **single-sourced**.\n- **Railway:** Its pricing page also lists a RAM rate of $50/GB/month [2]. The quoted snippet doesn't say what that rate applies to, so check it before you budget.\n\n**Caveat:** None of these sources has a date, so I can't confirm any of the prices are current as of today (18 Nov 2026). Before you commit, check supabase.com/pricing, neon.com/pricing and docs.railway.com/pricing.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Neon plans - Neon Docs",
+          "url": "https://neon.com/docs/introduction/plans",
+          "domain": "neon.com",
+          "official": true
+        },
+        {
+          "n": 2,
+          "title": "Pricing Plans",
+          "url": "https://docs.railway.com/pricing/plans",
+          "domain": "docs.railway.com",
+          "official": true
+        },
+        {
+          "n": 3,
+          "title": "Pricing",
+          "url": "https://docs.railway.com/pricing",
+          "domain": "docs.railway.com",
+          "official": true
+        },
+        {
+          "n": 4,
+          "title": "Neon’s New Pricing, Explained: Usage-Based, No Minimum - Neon",
+          "url": "https://neon.com/blog/new-usage-based-pricing",
+          "domain": "neon.com",
+          "official": true
+        },
+        {
+          "n": 5,
+          "title": "Supabase Pricing in 2026: Plans, Free Tier Limits & Full Breakdown",
+          "url": "https://uibakery.io/blog/supabase-pricing",
+          "domain": "uibakery.io",
+          "official": false
+        },
+        {
+          "n": 6,
+          "title": "Railway Pricing & Plans (November 2026)",
+          "url": "https://www.saasworthy.com/product/railway-app/pricing",
+          "domain": "saasworthy.com",
+          "official": false
+        },
+        {
+          "n": 7,
+          "title": "Supabase News",
+          "url": "https://blog.mean.ceo/supabase-news-november-2026/",
+          "domain": "blog.mean.ceo",
+          "official": false
+        },
+        {
+          "n": 8,
+          "title": "Supabase pricing: plans, free tier limits, and the bills AI is quietly creating",
+          "url": "https://www.cloudzero.com/blog/supabase-pricing/",
+          "domain": "cloudzero.com",
+          "official": false
+        },
+        {
+          "n": 9,
+          "title": "Supabase Review 2026: Free Tier Catch and the $599 Jump",
+          "url": "https://www.jetadmin.io/blog/supabase-review/",
+          "domain": "jetadmin.io",
+          "official": false
+        },
+        {
+          "n": 10,
+          "title": "Neon Pricing 2026: Plans, Limits & Changes",
+          "url": "https://www.saaspricepulse.com/tools/neon",
+          "domain": "saaspricepulse.com",
+          "official": false
+        },
+        {
+          "n": 11,
+          "title": "Supabase Pricing in 2026: What You'll Actually Pay (with Calculator)",
+          "url": "https://makerkit.dev/blog/saas/supabase-pricing",
+          "domain": "makerkit.dev",
+          "official": false
+        },
+        {
+          "n": 12,
+          "title": "Neon Pricing (2026): CU-Hours, Storage & Real Costs",
+          "url": "https://swyftstack.com/blog/neon-pricing-explained",
+          "domain": "swyftstack.com",
+          "official": false
+        }
+      ]
+    },
+    {
+      "scenario": "crm-shortlist-monday",
+      "step": 1,
+      "say": "We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing.",
+      "intent": "search",
+      "firstStatusMs": 2,
+      "firstTokenMs": 23619,
+      "firstModelTokenMs": 23619,
+      "totalMs": 35379,
+      "searches": 6,
+      "failedChecks": [
+        "every price is backed by a source"
+      ],
+      "warnings": [
+        "I couldn't match $280 to a current source. Treat it as unverified.",
+        "I couldn't match $400 to a current source. Treat it as unverified.",
+        "I couldn't match $1,600 to a current source. Treat it as unverified.",
+        "I couldn't match $2,180 to a current source. Treat it as unverified.",
+        "I couldn't match $99 to a current source. Treat it as unverified."
+      ],
+      "text": "For 20 seats, the lowest monthly costs in these sources are **Pipedrive Lite at about $280 (unverified)/month** (annual billing) and **HubSpot Starter at about $400 (unverified)/month**. Salesforce Professional is about $1,600 (unverified)/month, and Close Growth may be about $2,180 (unverified)/month. None of these sources give per-user prices for Zoho CRM's paid editions.\n\nThis assumes all 20 people need a paid seat, prices are per month, and prices are USD list prices. Most sources are undated third-party sites; the only dated one is from April 2026 [12]. Because the stakes are high, check the vendors' own pricing pages before you decide.\n\n| Vendor | Plan | List price | 20 seats / month | Notes |\n|---|---|---|---|---|\n| Pipedrive | Lite | $14/user/mo annual, $24 monthly [7] | 20 × $14 [7] = $280 (annual); 20 × $24 [7] = $480 (monthly) | Two sources agree on $14 [4][7] |\n| Pipedrive | Ultimate (top tier) | $79/user/mo annual, $99 monthly [7] | 20 × $79 [7] = $1,580 | Sources disagree, see below |\n| HubSpot | Sales Hub Starter | $20/seat/mo [3][11] | 20 × $20 [11] = $400 | Two sources agree; a third differs, see below |\n| HubSpot | Professional / Enterprise | $100–$890/mo and $150–$3,600/mo [11] | Can't compute | The source doesn't say how these scale per seat |\n| Salesforce | Essentials | $25/user/mo annual, max 10 users [5] | Not available | Your team is too large for this plan |\n| Salesforce | Professional | $80/user/mo annual [5] | 20 × $80 [5] = $1,600 | Single-sourced |\n| Salesforce | Enterprise | $175/user/mo [8] | 20 × $175 [8] = $3,500 | Single-sourced |\n| Salesforce | Unlimited | $350/user/mo [8] | 20 × $350 [8] = $7,000 | Single-sourced |\n| Zoho | CRM Free | $0, up to 3 users [6] | Not available | Your team is too large for this plan |\n| Zoho | Bigin (simpler CRM) | from $7/user annual [9] | 20 × $7 [9] = $140 | A separate, lighter product, not Zoho CRM itself |\n| Zoho | Zoho One | $37/employee/mo annual, if every employee is licensed [9] | 20 × $37 [9] = $740, only if your whole company is 20 people | Covers the whole company, not just sales |\n| Close | Solo | 1 user only [1] | Not available | Your team is too large for this plan |\n| Close | Growth | $109 regular monthly price [1] | 20 × $109 [1] = $2,180, if per user | The official page snippet doesn't say \"per user\" |\n\n**Where sources disagree**\n- **Pipedrive top tier:** one source lists $79/user annual and $99 monthly [7]. Another says list prices run up to $99 (unverified) even on annual billing [4]. Both are undated.\n- **HubSpot Starter:** two sources give $20/seat [3][11]. A third quotes Sales Hub Starter at about $300/month and Professional at about $1,800/month, without saying how many seats [10]. All are undated.\n- **Close:** one source's headline says $19–$149/user/mo. The same source says Solo dropped from $19 to $9 in April 2026 [12], so the range in its headline may be out of date.\n\n**Single-sourced key numbers:** all Salesforce prices, Close Growth, Pipedrive Ultimate, and both Zoho prices.\n\n**What's missing:** paid Zoho CRM editions (Standard and up) and per-seat prices for HubSpot Professional and Enterprise. You can check these at zoho.com/crm/pricing, hubspot.com/pricing, pipedrive.com/pricing, salesforce.com/pricing and close.com/pricing. At 20 seats, it's also worth asking each vendor for a quote, since list prices are often negotiable.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Close CRM Pricing & Plans",
+          "url": "https://close.com/pricing",
+          "domain": "close.com",
+          "official": true
+        },
+        {
+          "n": 2,
+          "title": "5 Best CRMs for sales teams",
+          "url": "https://www.folk.app/articles/best-crm-sales-teams",
+          "domain": "folk.app",
+          "official": false
+        },
+        {
+          "n": 3,
+          "title": "HubSpot Pricing 2026: Full Guide to Selecting the Right Plan",
+          "url": "https://www.emailvendorselection.com/hubspot-pricing/",
+          "domain": "emailvendorselection.com",
+          "official": false
+        },
+        {
+          "n": 4,
+          "title": "Pipedrive Software Pricing & Plans 2026: See Your Cost",
+          "url": "https://www.vendr.com/marketplace/pipedrive",
+          "domain": "vendr.com",
+          "official": false
+        },
+        {
+          "n": 5,
+          "title": "Salesforce Software Pricing & Plans 2026: See Your Cost",
+          "url": "https://www.vendr.com/marketplace/salesforce",
+          "domain": "vendr.com",
+          "official": false
+        },
+        {
+          "n": 6,
+          "title": "Zoho CRM Pricing 2026: Plans, Costs & Hidden Fees",
+          "url": "https://www.elsner.com/zoho-crm-pricing-plans-guide/",
+          "domain": "elsner.com",
+          "official": false
+        },
+        {
+          "n": 7,
+          "title": "Pipedrive Pricing 2026: Plans, Cost & What You Actually Pay",
+          "url": "https://dupple.com/pricing/pipedrive",
+          "domain": "dupple.com",
+          "official": false
+        },
+        {
+          "n": 8,
+          "title": "Salesforce Pricing 2026: Plans, Features & Costs Compared",
+          "url": "https://www.saasworthy.com/blog/salesforce-pricing",
+          "domain": "saasworthy.com",
+          "official": false
+        },
+        {
+          "n": 9,
+          "title": "Zoho CRM Pricing 2026: Editions, Bigin, Zoho One and What You’ll Pay",
+          "url": "https://www.spotsaas.com/blog/zoho-crm-pricing",
+          "domain": "spotsaas.com",
+          "official": false
+        },
+        {
+          "n": 10,
+          "title": "Best CRM Software 2026: Salesforce vs HubSpot vs Pipedrive (Head-to-Head Comparison)",
+          "url": "https://softwarerundown.com/best-crm-software-2026-salesforce-hubspot-pipedrive-comparison",
+          "domain": "softwarerundown.com",
+          "official": false
+        },
+        {
+          "n": 11,
+          "title": "HubSpot Pricing 2026: All Hubs, Tiers & Hidden Costs",
+          "url": "https://www.resonatehq.com/hubspot-pricing",
+          "domain": "resonatehq.com",
+          "official": false
+        },
+        {
+          "n": 12,
+          "title": "Close CRM Pricing 2026: $19–$149/user/mo (5 Plans)",
+          "url": "https://costbench.com/software/crm/close/",
+          "domain": "costbench.com",
+          "official": false
+        }
+      ]
+    },
+    {
+      "scenario": "crm-shortlist-monday",
+      "step": 2,
+      "say": "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?",
+      "intent": "verify",
+      "firstStatusMs": 1,
+      "firstTokenMs": 1,
+      "firstModelTokenMs": 27481,
+      "totalMs": 35037,
+      "searches": 10,
+      "failedChecks": [
+        "every price is backed by a source"
+      ],
+      "warnings": [
+        "I couldn't match $330 to a current source. Treat it as unverified.",
+        "I couldn't match $67 to a current source. Treat it as unverified.",
+        "I couldn't match $15 to a current source. Treat it as unverified."
+      ],
+      "text": "**Monday = Mon 9 Nov.**\n\nYou asked on Mon 9 Nov, 11:00: \"We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing.\"\n\nSince Mon 9 Nov: **1 changed**, 6 unchanged, 3 I couldn't verify.\n\n| What | Then (Mon 9 Nov) | Now (Thu 12 Nov) | Status |\n|---|---|---|---|\n| Pipedrive: Lite plan price, annual billing | $14 per user per month | $14 per user per month [2] | Unchanged |\n| Pipedrive: Lite plan price, monthly billing | $24 per user per month | $24 per user per month [2] | Unchanged |\n| Pipedrive: Ultimate plan price, annual billing | $79 per user per month | not found | Couldn't verify |\n| HubSpot: Sales Hub Starter price | $20 per seat per month | $20 per seat per month [3] | Unchanged |\n| Salesforce: Professional plan price, annual billing | $80 per user per month | not found | Couldn't verify |\n| Salesforce: Enterprise plan price | $175 per user per month | $175 per user per month [1] | Unchanged |\n| Salesforce: Unlimited plan price | $350 per user per month | $330 per user per month [4] | **Changed** |\n| Zoho CRM: Bigin starting price, annual billing | $7 per user per month | $7 per user per month [5] | Unchanged |\n| Zoho One price, annual billing: Zoho One price, annual billing | $37 per employee per month | $37 per employee per month [6] | Unchanged |\n| Close: Growth plan regular monthly price | $109 per user per month | not found | Couldn't verify |\n\n**Only one shortlisted price differs from Monday: Salesforce Unlimited now shows $330 (unverified)/user/month [4], down from the $350 we used.** For 20 seats that is 20 × $330 [4] = $6,600/month. This figure comes from a single, undated third-party guide, so confirm it on Salesforce's own pricing page. The other six prices match. I couldn't re-confirm Pipedrive Ultimate, Salesforce Professional or Close Growth, so check those on the vendors' pricing pages. None of today's sources is clearly dated after Monday, so I can't confirm any launch or repricing in the last three days.\n\n**New pricing details since Monday**\n- **Zoho CRM now has per-user prices.** On Monday we had none. One source lists Standard, Professional, Enterprise and Ultimate at $14, $23, $40 and $52 per user/month on annual billing [9], and $20, $35, $50 and $65 on monthly billing [9]. For 20 seats on annual billing, Standard is 20 × $14 [9] = $280 and Professional is 20 × $23 [9] = $460. This is single-sourced and undated.\n- **Zoho One's $37 may only apply in year one.** One source lists $37 per employee on All Employee annual billing [6]. Another says a November snapshot showed $37 as first-year-only, with Flexible pricing at $90 [9]. A third puts Flexible at $67 (unverified) on the US page against a $90 list price [6].\n- **HubSpot Starter depends on billing.** The source behind the $20 figure gives $15 (unverified)/seat/month on annual billing and $20 on monthly billing [3]. Another source says Starter begins at $7/seat [12]. All are undated, so check HubSpot's pricing page.\n\n**Recent product news (none confirmed as after Monday)**\n- **Salesforce:** an article titled \"Salesforce Rebuilds Its Price List\" covers edition repricing [1]. Its URL points to September 2026, which could explain the Unlimited difference.\n- **Zoho:** Zoho moved \"AI agents\" to different cards on its pricing pages in November 2026 [9]. The exact date isn't given.\n- **Pipedrive:** as of 26 Oct 2026, the Projects add-on shows \"Starting from $16\" [7], and the Pipedrive Nova announcement banner was removed [7].\n- **HubSpot:** in April 2026 it moved two Breeze agents to pay-per-result pricing [8]. Brian Halligan has also returned as CEO [8], but the source doesn't say when.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Salesforce Rebuilds Its Price List",
+          "url": "https://salesforcedictionary.com/news/salesforce-news-september-3-2026-editions-repricing-core-advanced-max",
+          "domain": "salesforcedictionary.com",
+          "official": true
+        },
+        {
+          "n": 2,
+          "title": "Complete Guide to Pipedrive Pricing 2026",
+          "url": "https://www.larksuite.com/en_us/blog/pipedrive-pricing",
+          "domain": "larksuite.com",
+          "official": false
+        },
+        {
+          "n": 3,
+          "title": "HubSpot Sales Hub Pricing 2026: Starter vs Professional vs Enterprise Compared",
+          "url": "https://www.sybill.ai/blogs/hubspot-sales-hub-pricing",
+          "domain": "sybill.ai",
+          "official": false
+        },
+        {
+          "n": 4,
+          "title": "Salesforce Pricing Guide 2026",
+          "url": "https://salesdorado.com/en/crm/crm-software/salesforce-pricing/",
+          "domain": "salesdorado.com",
+          "official": false
+        },
+        {
+          "n": 5,
+          "title": "Bigin by Zoho CRM Software Pricing, Alternatives & More 2026",
+          "url": "https://www.capterra.com/p/204998/Bigin-by-Zoho-CRM/",
+          "domain": "capterra.com",
+          "official": false
+        },
+        {
+          "n": 6,
+          "title": "Zoho One Pricing Explained: Plans, Costs, Fees & Key Details",
+          "url": "https://www.elsner.com/zoho-one-pricing-guide/",
+          "domain": "elsner.com",
+          "official": false
+        },
+        {
+          "n": 7,
+          "title": "How Pipedrive prices: pricing page breakdown (2026)",
+          "url": "https://www.withorb.com/pricing-atlas/pipedrive",
+          "domain": "withorb.com",
+          "official": false
+        },
+        {
+          "n": 8,
+          "title": "HubSpot Begins AI Overhaul With Founder Halligan As CEO, Again",
+          "url": "https://www.cmswire.com/digital-marketing/brian-halligan-returns-as-hubspot-ceo-replacing-yamini-rangan/",
+          "domain": "cmswire.com",
+          "official": false
+        },
+        {
+          "n": 9,
+          "title": "Zoho CRM pricing and editions: Free vs Standard, Professional, Enterprise and Ultimate",
+          "url": "https://techyorker.com/zoho-crm-editions-explained-which-plan-fits-your-team",
+          "domain": "techyorker.com",
+          "official": false
+        },
+        {
+          "n": 10,
+          "title": "Zoho Partner Nashik: Complete Expert Guide to Transform Business Growth (2026)",
+          "url": "https://codroiditlabs.com/zoho-partner-nashik",
+          "domain": "codroiditlabs.com",
+          "official": false
+        },
+        {
+          "n": 11,
+          "title": "Press Releases",
+          "url": "https://www.zoho.com/press.html",
+          "domain": "zoho.com",
+          "official": true
+        },
+        {
+          "n": 12,
+          "title": "HubSpot Pricing 2026: Is It Worth It?",
+          "url": "https://www.featurebase.app/blog/hubspot-pricing",
+          "domain": "featurebase.app",
+          "official": false
+        }
+      ]
+    },
+    {
+      "scenario": "what-did-i-ask-on-3-nov",
+      "step": 1,
+      "say": "How much is the Cloudflare Workers paid plan?",
+      "intent": "search",
+      "firstStatusMs": 1,
+      "firstTokenMs": 10827,
+      "firstModelTokenMs": 10827,
+      "totalMs": 12935,
+      "searches": 1,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match $5 to a current source. Treat it as unverified."
+      ],
+      "text": "**The Cloudflare Workers Paid plan costs a minimum of $5 per month per account** [4][5]. All of these sources are third-party and undated, so check Cloudflare's official Workers pricing page before you budget.\n\n**What you pay on top of the $5 (unverified) minimum:**\n- Extra requests cost $0.30 per million [1].\n- Extra CPU time costs $0.02 per million CPU milliseconds [2].\n\n**Free plan:** It costs nothing but is capped at 100,000 requests per day [3].\n\nMy sources don't clearly show how many requests and how much CPU time the $5 includes. The official pricing page or the Workers docs will list those allowances and any recent changes.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Cloudflare Workers Pricing Calculator (2026) — Estimate Your Monthly Bill",
+          "url": "https://makerkit.dev/pricing-calculator/cloudflare",
+          "domain": "makerkit.dev",
+          "official": false
+        },
+        {
+          "n": 2,
+          "title": "Cloudflare Workers Pricing: $5 Minimum, 10M Requests Included - DEV Community",
+          "url": "https://dev.to/sungwoo_lee_e0f26be4a29fd/cloudflare-workers-pricing-5-minimum-10m-requests-included-16c9",
+          "domain": "dev.to",
+          "official": false
+        },
+        {
+          "n": 3,
+          "title": "Cloudflare Workers Pricing 2026: Free vs Paid Plans",
+          "url": "https://www.activepieces.com/blog/cloudflare-workers-pricing-2026-free-vs-paid-plans",
+          "domain": "activepieces.com",
+          "official": false
+        },
+        {
+          "n": 4,
+          "title": "Cloudflare Workers Pricing 2026: Free Plan, KV & D1",
+          "url": "https://www.srvrlss.io/provider/cloudflare/",
+          "domain": "srvrlss.io",
+          "official": false
+        },
+        {
+          "n": 5,
+          "title": "Cloudflare Workers Paid: The Best $5 Plan for Developers",
+          "url": "https://www.natecue.com/en/learn/tech/cloudflare-workers-paid-5-dollar-plan/",
+          "domain": "natecue.com",
+          "official": false
+        }
+      ]
+    },
+    {
+      "scenario": "what-did-i-ask-on-3-nov",
+      "step": 2,
+      "say": "What did I ask you on 3 November? Is your answer still correct today?",
+      "intent": "verify",
+      "firstStatusMs": 1,
+      "firstTokenMs": 1,
+      "firstModelTokenMs": 15977,
+      "totalMs": 19984,
+      "searches": 2,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match $5 to a current source. Treat it as unverified."
+      ],
+      "text": "**3 November = Tue 3 Nov.**\n\nYou asked on Tue 3 Nov, 18:00: \"How much is the Cloudflare Workers paid plan?\"\n\nSince Tue 3 Nov: **1 changed**, 2 unchanged.\n\n| What | Then (Tue 3 Nov) | Now (Sun 15 Nov) | Status |\n|---|---|---|---|\n| Cloudflare Workers: Paid plan minimum price | $5 (unverified) per month per account | $5 per month [5] | **Changed** |\n| Cloudflare Workers: Extra requests price | $0.30 per million per million requests | $0.30 per million requests [2] | Unchanged |\n| Cloudflare Workers: Extra CPU time price | $0.02 per million CPU milliseconds per million CPU milliseconds | $0.02 per million CPU milliseconds [2] | Unchanged |\n\n**Yes, your 3 November answer still holds, and today's sources fill one gap it left open.** Back then I said the Workers Paid plan has a $5 per month minimum [5], with extra requests at $0.30 per million and extra CPU time at $0.02 per million CPU milliseconds [2].\n\n**What the \"Changed\" row means:** The $5 price itself didn't move. Last time I couldn't confirm it, so it was marked unverified. Now third-party sources state it [5][3][6], but the official pricing page excerpt I have [2] doesn't show the $5 (unverified), so confirm it there. Both overage rates are unchanged and come from Cloudflare's own docs [2], which are undated.\n\n**New since then:** Last time I couldn't say what the $5 includes. Cloudflare's docs now show 10 million requests and 30 million CPU milliseconds included per month [2].\n\n**Not re-verified:**\n- The Free plan cap of 100,000 requests per day isn't in today's sources.\n- One source is titled \"Cloudflare Pricing Changes 2026: Queues, Workers and Plan Updates\" [7], but I can't see what it says. Check Cloudflare's Workers pricing page for any recent updates.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Pricing · Cloudflare Workers AI docs",
+          "url": "https://developers.cloudflare.com/workers-ai/platform/pricing/",
+          "domain": "developers.cloudflare.com",
+          "official": true
+        },
+        {
+          "n": 2,
+          "title": "Pricing · Cloudflare Workers docs",
+          "url": "https://developers.cloudflare.com/workers/platform/pricing/",
+          "domain": "developers.cloudflare.com",
+          "official": true
+        },
+        {
+          "n": 3,
+          "title": "Cloudflare Workers Pricing: $5 Minimum, 10M Requests Included - DEV Community",
+          "url": "https://dev.to/sungwoo_lee_e0f26be4a29fd/cloudflare-workers-pricing-5-minimum-10m-requests-included-16c9",
+          "domain": "dev.to",
+          "official": false
+        },
+        {
+          "n": 4,
+          "title": "Cloudflare Workers Pricing 2026: Plans, Cost & Free Options",
+          "url": "https://toolradar.com/tools/cloudflare-workers/pricing",
+          "domain": "toolradar.com",
+          "official": false
+        },
+        {
+          "n": 5,
+          "title": "What Are Cloudflare Workers? Edge Serverless (2026)",
+          "url": "https://techjacksolutions.com/cloud-tools/cloudflare/what-are-cloudflare-workers/",
+          "domain": "techjacksolutions.com",
+          "official": false
+        },
+        {
+          "n": 6,
+          "title": "Cloudflare Workers Pricing (2026) — Plans, CPU-ms Costs & Calculator",
+          "url": "https://flarelog.dev/cloudflare-workers-pricing",
+          "domain": "flarelog.dev",
+          "official": false
+        },
+        {
+          "n": 7,
+          "title": "Cloudflare Pricing Changes 2026: Queues, Workers and Plan Updates",
+          "url": "https://blog.blazingcdn.com/en-us/cloudflares-pricing-changes-in-2025-what-you-need-to-know",
+          "domain": "blog.blazingcdn.com",
+          "official": false
+        }
+      ]
+    },
+    {
+      "scenario": "what-did-i-ask-on-3-nov",
+      "step": 3,
+      "say": "What did I ask you on 4 November?",
+      "intent": "recall",
+      "firstStatusMs": null,
+      "firstTokenMs": 1,
+      "firstModelTokenMs": 1612,
+      "totalMs": 2717,
+      "searches": 0,
+      "failedChecks": [],
+      "warnings": [],
+      "text": "**4 November = Wed 4 Nov.**\n\nI have no record of a conversation on Wed 4 Nov.\n\nThe closest conversation I have is from the day before, **Tue 3 Nov at 18:00**, when you asked: \"How much is the Cloudflare Workers paid plan?\" We just re-checked that answer above.\n\nIf you meant that one, nothing more is needed. If you're thinking of something else around 4 November, tell me the topic and I'll look for it.",
+      "sources": []
+    },
+    {
+      "scenario": "right-moment-nudge",
+      "step": 1,
+      "say": "What does Postgres hosting cost on Supabase, Neon and Railway?",
+      "intent": "search",
+      "firstStatusMs": 1,
+      "firstTokenMs": 13467,
+      "firstModelTokenMs": 13467,
+      "totalMs": 21473,
+      "searches": 4,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match $0 to a current source. Treat it as unverified.",
+        "I couldn't match $15 to a current source. Treat it as unverified."
+      ],
+      "text": "All three have a $0 (unverified) entry tier. Paid Postgres hosting starts at **$5/month on Railway**, **about $15 (unverified)/month typical on Neon** (usage-based), and **$25/month on Supabase Pro**. None of the sources carries a publication date, so check the official pages before you commit.\n\nI read this as \"what are the plans and usage rates.\" Your actual bill depends on compute, storage and egress.\n\n| | Free | Entry paid | Higher tier | Usage rates |\n|---|---|---|---|---|\n| **Supabase** | $0/month [4] | Pro: $25/month per organization plus usage overages [4] | Team: $599/month [4] | Egress $0.09/GB [8]; $0.00325 per monthly active user over 100,000 [4] |\n| **Neon** | $0, no credit card [1]; 100 CU-hours and 0.5 GB storage per project [5] | Launch: $0.106 per CU-hr, $0.35 per GB-month; typical spend $15/month [1] | Scale: $0.222 per CU-hr, $0.35 per GB-month; typical spend $701/month [1] | Billed per compute-hour and storage [1] |\n| **Railway** | $0/month with $1 of usage credits [2] | Hobby: $5/month, including $5 of usage credits [2][3] | Pro: $20/month per workspace, including $20 of usage credits [2][3]; Enterprise is custom [3] | RAM $10/GB/month, CPU $20/vCPU/month, egress $0.05/GB [3] |\n\n**How each one bills**\n- **Railway** has no separate Postgres price. You pay for the CPU, RAM and egress your database container uses, and the plan's included credits offset that. For example, 1 TB of egress is 1,000 GB x $0.05 [3] = $50, which matches a third-party figure [6].\n- **Neon** is purely usage-based on paid plans. The \"$15\" and \"$701\" figures are Neon's stated typical spend, not fixed prices [1].\n- **Supabase** charges a flat fee per organization plus overages [4].\n\n**How reliable these numbers are**\n- **Supabase:** every figure comes from a third-party blog [4][8], not supabase.com. Each one is single-sourced. Verify them on supabase.com/pricing.\n- **Neon:** compute rates are confirmed by the official page and a third party [1][5]. The free-tier limits of 100 CU-hours and 0.5 GB come only from a third-party source [5].\n- **Railway:** plan prices and resource rates are confirmed by official pages and a third party [2][3][6]. Egress at $0.05/GB comes only from Railway's docs [3].\n\nIf you share your expected database size, traffic and always-on vs. idle pattern, I can rough out a monthly estimate for each.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Neon Pricing: Free Plan With 100 Projects, Typical Spend $15/Month",
+          "url": "https://neon.com/pricing",
+          "domain": "neon.com",
+          "official": true
+        },
+        {
+          "n": 2,
+          "title": "--- title: Railway Pricing",
+          "url": "https://railway.com/pricing.md",
+          "domain": "railway.com",
+          "official": true
+        },
+        {
+          "n": 3,
+          "title": "Pricing Plans",
+          "url": "https://docs.railway.com/pricing/plans",
+          "domain": "docs.railway.com",
+          "official": true
+        },
+        {
+          "n": 4,
+          "title": "Supabase Pricing: 2026 Guide to Plans, Limits, and Real-World Costs",
+          "url": "https://www.jetadmin.io/blog/supabase-pricing-2026-guide-to-plans-limits-and-real-world-costs/",
+          "domain": "jetadmin.io",
+          "official": false
+        },
+        {
+          "n": 5,
+          "title": "Neon Pricing 2026: Plans, Costs & Limits",
+          "url": "https://www.jetadmin.io/blog/neon-pricing/",
+          "domain": "jetadmin.io",
+          "official": false
+        },
+        {
+          "n": 6,
+          "title": "Railway Pricing 2026: Plans, Usage Rates and Costs",
+          "url": "https://www.activepieces.com/blog/railway-pricing-2026-plans-usage-rates-and-costs",
+          "domain": "activepieces.com",
+          "official": false
+        },
+        {
+          "n": 7,
+          "title": "PostgreSQL and SQLite hosting: free and paid options",
+          "url": "https://flaviocopes.com/database-hosting-options/",
+          "domain": "flaviocopes.com",
+          "official": false
+        },
+        {
+          "n": 8,
+          "title": "Supabase pricing: plans, free tier limits, and the bills AI is quietly creating",
+          "url": "https://www.cloudzero.com/blog/supabase-pricing/",
+          "domain": "cloudzero.com",
+          "official": false
+        }
+      ]
+    },
+    {
+      "scenario": "right-moment-nudge",
+      "step": 2,
+      "say": "(opens a new chat)",
+      "intent": "nudge",
+      "firstStatusMs": null,
+      "firstTokenMs": null,
+      "firstModelTokenMs": null,
+      "totalMs": 0,
+      "searches": 0,
+      "failedChecks": [],
+      "warnings": [],
+      "text": "",
+      "sources": []
+    },
+    {
+      "scenario": "right-moment-nudge",
+      "step": 3,
+      "say": "(opens a new chat)",
+      "intent": "nudge",
+      "firstStatusMs": null,
+      "firstTokenMs": null,
+      "firstModelTokenMs": null,
+      "totalMs": 0,
+      "searches": 3,
+      "failedChecks": [],
+      "warnings": [],
+      "text": "**Heads-up:** something you asked about on Tue 10 Nov has changed. Neon free tier compute included: 100 CU-hours per project then, **100 CU-hours per month** now [1]. (1 more change: ask me \"anything new?\")",
+      "sources": []
+    },
+    {
+      "scenario": "right-moment-nudge",
+      "step": 4,
+      "say": "(opens a new chat)",
+      "intent": "nudge",
+      "firstStatusMs": null,
+      "firstTokenMs": null,
+      "firstModelTokenMs": null,
+      "totalMs": 0,
+      "searches": 0,
+      "failedChecks": [],
+      "warnings": [],
+      "text": "",
+      "sources": []
+    },
+    {
+      "scenario": "fast-paths-and-follow-ups",
+      "step": 1,
+      "say": "hi",
+      "intent": "chat",
+      "firstStatusMs": null,
+      "firstTokenMs": 865,
+      "firstModelTokenMs": 865,
+      "totalMs": 1308,
+      "searches": 0,
+      "failedChecks": [],
+      "warnings": [],
+      "text": "Hi! 👋 What can I help you with today?",
+      "sources": []
+    },
+    {
+      "scenario": "fast-paths-and-follow-ups",
+      "step": 2,
+      "say": "How much is the Cloudflare Workers paid plan?",
+      "intent": "search",
+      "firstStatusMs": 1,
+      "firstTokenMs": 7853,
+      "firstModelTokenMs": 7853,
+      "totalMs": 10507,
+      "searches": 1,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match $5 to a current source. Treat it as unverified."
+      ],
+      "text": "**The Cloudflare Workers Paid plan costs $5 per month per account** [2][4]. That's a minimum charge, and usage above the included amounts is billed on top [5].\n\n**What the $5 (unverified)/month includes:**\n- 10 million requests per month [2][3]\n- 30 million CPU milliseconds per month [2][3]\n- 1 million Workers KV writes, deletes, and lists per month [5]\n\n**Overage pricing:**\n- Requests: $0.30 per additional million [5]\n- KV writes: $5 per additional million [5]\n\nAll five sources agree on the $5 (unverified)/month price, but they are third-party sites with no publish date, and none is Cloudflare's own page. Check the current rates, including CPU-time overage (which these sources don't list), on Cloudflare's official Workers pricing page at developers.cloudflare.com/workers/platform/pricing.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Cloudflare Workers Pricing Calculator (2026) — Estimate Your Monthly Bill",
+          "url": "https://makerkit.dev/pricing-calculator/cloudflare",
+          "domain": "makerkit.dev",
+          "official": false
+        },
+        {
+          "n": 2,
+          "title": "Cloudflare Workers Pricing: $5 Minimum, 10M Requests Included - DEV Community",
+          "url": "https://dev.to/sungwoo_lee_e0f26be4a29fd/cloudflare-workers-pricing-5-minimum-10m-requests-included-16c9",
+          "domain": "dev.to",
+          "official": false
+        },
+        {
+          "n": 3,
+          "title": "Cloudflare Workers Pricing 2026: Free vs Paid Plans",
+          "url": "https://www.activepieces.com/blog/cloudflare-workers-pricing-2026-free-vs-paid-plans",
+          "domain": "activepieces.com",
+          "official": false
+        },
+        {
+          "n": 4,
+          "title": "Cloudflare Workers Pricing Calculator: KV, D1, R2 and More",
+          "url": "https://cloudsteading.com/pricing/cloudflare-workers",
+          "domain": "cloudsteading.com",
+          "official": false
+        },
+        {
+          "n": 5,
+          "title": "Cloudflare Workers Pricing 2026: Free Plan, KV & D1",
+          "url": "https://www.srvrlss.io/provider/cloudflare/",
+          "domain": "srvrlss.io",
+          "official": false
+        }
+      ]
+    },
+    {
+      "scenario": "fast-paths-and-follow-ups",
+      "step": 3,
+      "say": "Is that still correct?",
+      "intent": "verify",
+      "firstStatusMs": 1,
+      "firstTokenMs": 1,
+      "firstModelTokenMs": 16415,
+      "totalMs": 20068,
+      "searches": 2,
+      "failedChecks": [],
+      "warnings": [],
+      "text": "You asked on Tue 10 Nov, 10:01: \"How much is the Cloudflare Workers paid plan?\"\n\nSince Tue 10 Nov: **1 changed**, 2 unchanged.\n\n| What | Then (Tue 10 Nov) | Now (Tue 10 Nov) | Status |\n|---|---|---|---|\n| Cloudflare Workers: Paid plan price | $5 (unverified) per month per account | $5 per month [7] | **Changed** |\n| Cloudflare Workers: Paid plan included requests | 10 million per month | 10 million per month [2] | Unchanged |\n| Cloudflare Workers: Paid plan included CPU time | 30 million CPU milliseconds per month | 30 million CPU milliseconds per month [2] | Unchanged |\n\n**Yes, it's still correct.** The Workers Paid plan is $5 per month [7], with 10 million requests and 30 million CPU milliseconds included [2].\n\nThe \"Changed\" row in the table reflects a change in sourcing, not in price. The $5 figure was unverified before and now comes from a pricing calculator [7]. However, that is still a third-party site, and Cloudflare's own docs page doesn't show the base price in what I found [2]. The included requests and CPU time are unchanged and now come from Cloudflare's official pricing page [2]. That page also fills the earlier gap on CPU-time overage: $0.02 per additional million CPU milliseconds, with requests at $0.30 per additional million [2]. None of these sources is dated, so confirm on developers.cloudflare.com/workers/platform/pricing before you rely on it.\n\n**Other recent pricing notes:**\n- Workers Logs cost $0.60 per million log messages beyond 20 million included [6].\n- Workers AI is included in both Free and Paid plans at $0.011 per 1,000 Neurons [1].\n- Cloudflare raised its Pro plan from $20 to $25/month in early 2026 [4]. That's the website plan, not Workers, so it doesn't affect the $5 Workers price.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Pricing · Cloudflare Workers AI docs",
+          "url": "https://developers.cloudflare.com/workers-ai/platform/pricing/",
+          "domain": "developers.cloudflare.com",
+          "official": true
+        },
+        {
+          "n": 2,
+          "title": "Pricing · Cloudflare Workers docs",
+          "url": "https://developers.cloudflare.com/workers/platform/pricing/",
+          "domain": "developers.cloudflare.com",
+          "official": true
+        },
+        {
+          "n": 3,
+          "title": "Cloudflare Workers Pricing 2026: Free vs Paid Plans",
+          "url": "https://www.activepieces.com/blog/cloudflare-workers-pricing-2026-free-vs-paid-plans",
+          "domain": "activepieces.com",
+          "official": false
+        },
+        {
+          "n": 4,
+          "title": "Cloudflare Pricing Changes 2026: Queues, Workers and Plan Updates",
+          "url": "https://blog.blazingcdn.com/en-us/cloudflares-pricing-changes-in-2025-what-you-need-to-know",
+          "domain": "blog.blazingcdn.com",
+          "official": false
+        },
+        {
+          "n": 5,
+          "title": "Cloudflare Workers and Pages Pricing: What It Really Costs",
+          "url": "https://blog.blazingcdn.com/en-us/cloudflares-pricing-for-developers-a-closer-look-at-workers-pages",
+          "domain": "blog.blazingcdn.com",
+          "official": false
+        },
+        {
+          "n": 6,
+          "title": "Cloudflare Workers Pricing 2026: Plans, Cost & Free Options",
+          "url": "https://toolradar.com/tools/cloudflare-workers/pricing",
+          "domain": "toolradar.com",
+          "official": false
+        },
+        {
+          "n": 7,
+          "title": "Cloudflare Workers Pricing Calculator (2026) — Estimate Your Monthly Bill",
+          "url": "https://makerkit.dev/pricing-calculator/cloudflare",
+          "domain": "makerkit.dev",
+          "official": false
+        }
+      ]
+    },
+    {
+      "scenario": "fast-paths-and-follow-ups",
+      "step": 4,
+      "say": "What does Postgres hosting cost on Supabase, Neon and Railway?",
+      "intent": "search",
+      "firstStatusMs": 1,
+      "firstTokenMs": 17632,
+      "firstModelTokenMs": 17632,
+      "totalMs": 24836,
+      "searches": 4,
+      "failedChecks": [],
+      "warnings": [],
+      "text": "**The entry paid tiers are Supabase Pro at $25/month [4][7], Neon Launch at about $15/month typical spend [1], and Railway Hobby at $5/month [2][3].** Neon and Railway charge by usage, so your actual bill depends on compute and storage. None of the sources are dated, so check the official pages today, 10 Nov 2026.\n\n| Provider | Free tier | Entry paid | Higher tier | Usage rates |\n|---|---|---|---|---|\n| **Supabase** | Not in my sources | Pro: $25/month [4][7] | Not in my sources | $0.00325 per extra monthly active user over 100,000 [4] |\n| **Neon** | $0, no credit card [1]; 100 CU-hours and 1 GB per project [7] | Launch: usage-based, typical spend $15/month [1] | Scale: usage-based, typical spend $701/month [1] | Compute $0.106/CU-hour on Launch, $0.222/CU-hour on Scale [5] |\n| **Railway** | $0/month with $1 usage credit [2] | Hobby: $5/month including $5 of usage credit [2][3] | Pro: $20/month per workspace including $20 of credit [2][3]; Enterprise custom [3] | RAM $10/GB/month, CPU $20/vCPU/month [3][6]; egress $0.05/GB [3] |\n\n**How they differ:**\n- **Supabase** has a fixed plan fee, so it's the most predictable.\n- **Neon's** \"typical spend\" figures are Neon's own estimates [1], not fixed prices. You pay for compute hours.\n- **Railway** has no separate database price in these sources. The plan fee is credit toward resource usage [2][3], so a small Postgres instance may fit inside the $5 Hobby credit. Bigger ones bill on top. Seats are unlimited on Railway, since the fee is per workspace [2].\n\n**Sourcing caveats:**\n- **Supabase:** both price sources are third-party blogs [4][7]. I have nothing from Supabase itself, and the per-user overage rate comes from a single source [4]. Confirm at supabase.com/pricing.\n- **Neon:** the compute rates of $0.106 and $0.222 per CU-hour come from a single third-party source [5]. Confirm at neon.com/pricing.\n- **Railway:** the figures come from Railway's official pages [2][3] and agree with third-party coverage [6].",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Neon Pricing: Free Plan With 100 Projects, Typical Spend $15/Month",
+          "url": "https://neon.com/pricing",
+          "domain": "neon.com",
+          "official": true
+        },
+        {
+          "n": 2,
+          "title": "--- title: Railway Pricing",
+          "url": "https://railway.com/pricing.md",
+          "domain": "railway.com",
+          "official": true
+        },
+        {
+          "n": 3,
+          "title": "Pricing Plans",
+          "url": "https://docs.railway.com/pricing/plans",
+          "domain": "docs.railway.com",
+          "official": true
+        },
+        {
+          "n": 4,
+          "title": "Supabase Pricing: 2026 Guide to Plans, Limits, and Real-World Costs",
+          "url": "https://www.jetadmin.io/blog/supabase-pricing-2026-guide-to-plans-limits-and-real-world-costs/",
+          "domain": "jetadmin.io",
+          "official": false
+        },
+        {
+          "n": 5,
+          "title": "Neon Pricing 2026: Plans, Costs & Limits",
+          "url": "https://www.jetadmin.io/blog/neon-pricing/",
+          "domain": "jetadmin.io",
+          "official": false
+        },
+        {
+          "n": 6,
+          "title": "Railway Pricing 2026: Plans, Usage Rates and Costs",
+          "url": "https://www.activepieces.com/blog/railway-pricing-2026-plans-usage-rates-and-costs",
+          "domain": "activepieces.com",
+          "official": false
+        },
+        {
+          "n": 7,
+          "title": "PostgreSQL and SQLite hosting: free and paid options",
+          "url": "https://flaviocopes.com/database-hosting-options/",
+          "domain": "flaviocopes.com",
+          "official": false
+        },
+        {
+          "n": 8,
+          "title": "10 Best Managed Postgres Providers Compared (2026)",
+          "url": "https://dreamlit.ai/blog/top-10-managed-postgres-providers",
+          "domain": "dreamlit.ai",
+          "official": false
+        }
+      ]
+    },
+    {
+      "scenario": "fast-paths-and-follow-ups",
+      "step": 5,
+      "say": "Anything new?",
+      "intent": "updates",
+      "firstStatusMs": 1,
+      "firstTokenMs": 11870,
+      "firstModelTokenMs": 17865,
+      "totalMs": 21220,
+      "searches": 6,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match $10 to a current source. Treat it as unverified."
+      ],
+      "text": "Nothing I checked has changed since Tue 10 Nov (8 of 8 verified).\n\n| What | Then (Tue 10 Nov) | Now (Fri 20 Nov) | Status |\n|---|---|---|---|\n| Supabase: Pro plan price | $25 per month | $25 per month [12] | Unchanged |\n| Supabase: monthly active user overage rate over 100,000 | $0.00325 per monthly active user | $0.00325 per monthly active user [4] | Unchanged |\n| Neon: Launch plan typical spend | $15 per month | $15 per month [1] | Unchanged |\n| Neon: Scale plan typical spend | $701 per month | $701 per month [1] | Unchanged |\n| Neon: free plan price | $0 per month | $0 per month [1] | Unchanged |\n| Railway: free plan price | $0 per month | $0 per month [2] | Unchanged |\n\n(2 more facts checked: 2 unchanged.)\n\n**No prices have changed since 10 Nov, and my sources show no new launches or pricing changes in the past ten days.** The sourcing is stronger now, though, and a few details are new.\n\n**Now confirmed by official pages:**\n- **Neon compute rates:** $0.106/CU-hour on Launch and $0.222/CU-hour on Scale now come from Neon's own pricing page [1] and its pricing blog post [3], not a single third-party source. That post was published about 13 days ago, around 7 Nov, so it predates our last chat. It also says paid plans have no monthly minimum [3].\n- **Supabase overage:** $0.00325 per monthly active user over 100,000 is now confirmed by Supabase's own docs [4].\n\n**New details:**\n- **Supabase Pro** at $25/month includes $10 (unverified) in compute credits [12]. This comes from a third-party news post, and the $25 price itself still has no official Supabase source here [8][12].\n- **Neon storage** on Launch is $0.35/GB-month [10], from a single third-party review.\n\n**Still unverified:** all sources are undated except the Neon blog. Check supabase.com/pricing for the Pro price and its credits.",
+      "sources": [
+        {
+          "n": 1,
+          "title": "Neon Pricing: Free Plan With 100 Projects, Typical Spend $15/Month",
+          "url": "https://neon.com/pricing",
+          "domain": "neon.com",
+          "official": true
+        },
+        {
+          "n": 2,
+          "title": "Pricing Plans",
+          "url": "https://docs.railway.com/pricing/plans",
+          "domain": "docs.railway.com",
+          "official": true
+        },
+        {
+          "n": 3,
+          "title": "Neon’s New Pricing, Explained: Usage-Based, No Minimum - Neon",
+          "url": "https://neon.com/blog/new-usage-based-pricing",
+          "domain": "neon.com",
+          "official": true
+        },
+        {
+          "n": 4,
+          "title": "Manage Monthly Active Users usage",
+          "url": "https://supabase.com/docs/guides/platform/manage-your-usage/monthly-active-users",
+          "domain": "supabase.com",
+          "official": true
+        },
+        {
+          "n": 5,
+          "title": "Pricing",
+          "url": "https://docs.railway.com/pricing",
+          "domain": "docs.railway.com",
+          "official": true
+        },
+        {
+          "n": 6,
+          "title": "--- title: Railway Pricing",
+          "url": "https://railway.com/pricing.md",
+          "domain": "railway.com",
+          "official": true
+        },
+        {
+          "n": 7,
+          "title": "Railway Pricing & Plans (November 2026)",
+          "url": "https://www.saasworthy.com/product/railway-app/pricing",
+          "domain": "saasworthy.com",
+          "official": false
+        },
+        {
+          "n": 8,
+          "title": "Supabase Pricing: 2026 Guide to Plans, Limits, and Real-World Costs",
+          "url": "https://www.jetadmin.io/blog/supabase-pricing-2026-guide-to-plans-limits-and-real-world-costs/",
+          "domain": "jetadmin.io",
+          "official": false
+        },
+        {
+          "n": 9,
+          "title": "Supabase Pricing 2026: Free vs Pro ($25) vs Team ($599)",
+          "url": "https://www.nocode.mba/articles/supabase-pricing",
+          "domain": "nocode.mba",
+          "official": false
+        },
+        {
+          "n": 10,
+          "title": "Neon Review 2026: Branching, Pricing, and the Rate Anomaly",
+          "url": "https://www.jetadmin.io/blog/neon-review/",
+          "domain": "jetadmin.io",
+          "official": false
+        },
+        {
+          "n": 11,
+          "title": "Neon - Features, Pricing & Alternatives",
+          "url": "https://www.srvrlss.io/provider/neon/",
+          "domain": "srvrlss.io",
+          "official": false
+        },
+        {
+          "n": 12,
+          "title": "Supabase News",
+          "url": "https://blog.mean.ceo/supabase-news-november-2026/",
+          "domain": "blog.mean.ceo",
+          "official": false
+        }
+      ]
+    }
+  ]
+}

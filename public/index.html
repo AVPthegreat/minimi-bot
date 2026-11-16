@@ -2,42 +2,79 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Minimi Agent</title>
-  <link rel="stylesheet" href="/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>minimi bot</title>
+  <meta name="description" content="A chat agent that searches the web, remembers what you asked and when, and tells you when a fact changes.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/markdown.css">
+  <!-- The saved theme is applied before first paint (no flash); theme.js owns it after that. -->
+  <script>try { const t = localStorage.getItem("minimi:theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
 </head>
 <body>
-  <aside id="sidebar" aria-label="Past conversations">
-    <button id="new-chat" type="button">+ New chat</button>
-    <nav id="sessions" aria-live="polite"></nav>
-    <div id="env" class="muted small"></div>
-    <form id="clock-form" hidden>
-      <label for="clock-input" class="small muted">Demo clock (moves "now" to test memory across days)</label>
-      <div class="row">
-        <input id="clock-input" type="datetime-local">
-        <button type="submit">Set</button>
-        <button type="button" id="clock-reset" title="Back to the real time">Real</button>
+  <div class="dunes" aria-hidden="true">
+    <svg viewBox="0 0 1440 700" preserveAspectRatio="none" focusable="false">
+      <path class="d1" d="M0 260C220 170 420 150 640 210s420 40 560-40 200-60 240-40V700H0Z"/>
+      <path class="d2" d="M0 420C180 330 380 300 620 360s460 70 600-20 180-80 220-60V700H0Z"/>
+      <path class="d3" d="M0 560c240-120 520-170 780-110s420 20 660-110V700H0Z"/>
+      <path class="d4" d="M300 700c260-120 600-170 1140-150V700Z"/>
+    </svg>
+  </div>
+
+  <div class="app">
+    <aside id="sidebar" class="sidebar" aria-label="Conversations">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 32 28" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8.6 1.5 12.4 6.1Q16 5.2 19.6 6.1L23.4 1.5 24.6 9.6Q25.4 14.6 21.6 16.6H10.4Q6.6 14.6 7.4 9.6Z"/><path fill="currentColor" d="M9.6 15.6Q5.6 20 6.6 27h18.8q1-7-3-11.4Z"/><path d="M25 26.6q5.4-1.6 4.4-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><ellipse cx="12.9" cy="11" rx="1.15" ry="1.5" fill="var(--panel, #fff)"/><ellipse cx="19.1" cy="11" rx="1.15" ry="1.5" fill="var(--panel, #fff)"/></svg>
+        <span class="wordmark">minimi <span>bot</span></span>
+        <button id="close-sidebar" class="icon-btn only-phone" type="button" aria-label="Close conversations"></button>
       </div>
-    </form>
-  </aside>
-  <main>
-    <header>
-      <button id="toggle-sidebar" type="button" aria-label="Show conversations">&#9776;</button>
-      <span id="now" class="muted small"></span>
-    </header>
-    <section id="log" aria-live="polite" aria-label="Conversation">
-      <div id="empty" class="empty">
-        <h1>Ask me anything.</h1>
-        <p class="muted">I search the web, cite sources with dates, and remember what you asked and when.
-          Later you can ask "what did I ask on Tuesday?" or "is that still correct?".</p>
+      <button id="new-chat" class="btn btn-primary btn-block" type="button">
+        <span data-icon="plus"></span><span>New chat</span><kbd id="new-chat-kbd" class="kbd kbd-on-btn">Ctrl K</kbd>
+      </button>
+      <nav id="sessions" class="sessions" aria-label="Past conversations"></nav>
+      <div class="sidebar-foot">
+        <details id="clock" class="clock" hidden>
+          <summary><span data-icon="clock"></span><span>Demo clock</span></summary>
+          <form id="clock-form" class="clock-form">
+            <label for="clock-input">Move "now" to test memory across days</label>
+            <input id="clock-input" type="datetime-local" required>
+            <div class="row">
+              <button class="btn btn-small" type="submit">Set time</button>
+              <button id="clock-reset" class="btn btn-small btn-ghost" type="button">Real time</button>
+            </div>
+          </form>
+        </details>
+        <div id="env" class="env-chip" role="status"></div>
       </div>
-    </section>
-    <form id="composer">
-      <label for="input" class="visually-hidden">Message</label>
-      <textarea id="input" rows="1" maxlength="4000" placeholder="Message Minimi" autofocus></textarea>
-      <button id="send" type="submit">Send</button>
-    </form>
-  </main>
-  <script src="/app.js" type="module"></script>
+    </aside>
+    <button id="scrim" class="scrim" type="button" aria-label="Close conversations" tabindex="-1" hidden></button>
+
+    <main id="main" class="main">
+      <header class="topbar">
+        <button id="open-sidebar" class="icon-btn only-phone" type="button" aria-label="Show conversations" aria-controls="sidebar" aria-expanded="false"></button>
+        <div id="now" class="now-chip" title="The time minimi uses for words like yesterday or last Tuesday"></div>
+        <div class="topbar-actions">
+          <a class="btn btn-small btn-ghost report-link" href="/report"><span data-icon="chart"></span><span class="report-label">Report</span></a>
+          <button id="new-chat-top" class="icon-btn only-phone" type="button" aria-label="New chat"></button>
+          <button id="theme" class="icon-btn" type="button" aria-label="Switch theme"></button>
+        </div>
+      </header>
+      <div id="banner" class="banner-slot" aria-live="assertive"></div>
+      <section id="log" class="log" aria-label="Conversation" aria-busy="false"></section>
+      <div class="composer-wrap">
+        <form id="composer" class="composer" autocomplete="off">
+          <label for="input" class="visually-hidden">Message minimi</label>
+          <textarea id="input" rows="1" maxlength="4000" placeholder="Ask about prices, plans, releases, or what you asked last week" enterkeyhint="send"></textarea>
+          <button id="send" class="send-btn" type="submit" aria-label="Send message"></button>
+        </form>
+        <p class="composer-hint"><span><kbd class="kbd">Enter</kbd> send</span><span><kbd class="kbd">Shift Enter</kbd> new line</span><span id="count" aria-live="polite"></span></p>
+      </div>
+    </main>
+  </div>
+  <script src="/js/main.js" type="module"></script>
 </body>
 </html>

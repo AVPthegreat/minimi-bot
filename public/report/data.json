@@ -1,0 +1,594 @@
+{
+  "generatedAt": "2026-11-16T11:42:32.287Z",
+  "note": "Built by npm run report from eval/live-reports (live runs with the real models) and an offline run of npm run eval and npm test.",
+  "totals": {
+    "liveRuns": 4,
+    "spendUsd": 4.7235,
+    "calls": 342,
+    "webSearches": 224
+  },
+  "latest": {
+    "run": 4,
+    "passed": 106,
+    "total": 107,
+    "scenarios": 12
+  },
+  "sameSuite": {
+    "scenarios": 5,
+    "before": {
+      "run": 1,
+      "passed": 26,
+      "total": 36
+    },
+    "after": {
+      "run": 4,
+      "passed": 36,
+      "total": 36
+    }
+  },
+  "offline": {
+    "eval": {
+      "passed": 131,
+      "failed": 0,
+      "scenarios": 12
+    },
+    "unitTests": {
+      "total": 100,
+      "passed": 100
+    },
+    "measuredAt": "2026-11-16T11:42:32.287Z"
+  },
+  "latency": {
+    "run": 4,
+    "overall": {
+      "turns": 39,
+      "firstStatusMs": 1,
+      "firstTextMs": 724,
+      "totalMs": 10357
+    },
+    "byIntent": [
+      {
+        "intent": "search",
+        "turns": 12,
+        "firstStatusMs": 1,
+        "firstTextMs": 12760,
+        "firstModelTokenMs": 12760,
+        "totalMs": 19561,
+        "searchesAvg": 2.7
+      },
+      {
+        "intent": "verify",
+        "turns": 7,
+        "firstStatusMs": 1,
+        "firstTextMs": 1,
+        "firstModelTokenMs": 14614,
+        "totalMs": 17864,
+        "searchesAvg": 3.7
+      },
+      {
+        "intent": "recall",
+        "turns": 9,
+        "firstStatusMs": null,
+        "firstTextMs": 1,
+        "firstModelTokenMs": 1610,
+        "totalMs": 2943,
+        "searchesAvg": 0
+      },
+      {
+        "intent": "chat",
+        "turns": 5,
+        "firstStatusMs": 1,
+        "firstTextMs": 1018,
+        "firstModelTokenMs": 1018,
+        "totalMs": 2946,
+        "searchesAvg": 0.2
+      },
+      {
+        "intent": "updates",
+        "turns": 2,
+        "firstStatusMs": 1,
+        "firstTextMs": 9775,
+        "firstModelTokenMs": 14586,
+        "totalMs": 18048,
+        "searchesAvg": 4
+      }
+    ]
+  },
+  "runs": [
+    {
+      "run": 1,
+      "at": "2026-11-16T10:15:51.947Z",
+      "mode": "live",
+      "models": {
+        "answer": "claude-opus-5-5",
+        "fast": "claude-haiku-5-5",
+        "search": "anthropic",
+        "searchModel": "claude-haiku-5-5"
+      },
+      "passed": 26,
+      "failed": 10,
+      "total": 36,
+      "skippedLive": 12,
+      "spendUsd": 1.2808,
+      "calls": 43,
+      "webSearches": 56,
+      "unverifiedPrices": null,
+      "scenarios": [
+        {
+          "name": "postgres-last-tuesday",
+          "about": "Ask about Postgres hosting on Tue 10 Nov; on Wed 18 Nov ask whether pricing changed since 'last Tuesday'.",
+          "steps": 2,
+          "passed": 7,
+          "failed": 4,
+          "skipped": 4
+        },
+        {
+          "name": "crm-shortlist-monday",
+          "about": "Shortlist 5 CRMs on Mon 9 Nov; on Thu 12 Nov ask if any changed pricing or shipped something big since Monday.",
+          "steps": 2,
+          "passed": 2,
+          "failed": 5,
+          "skipped": 3
+        },
+        {
+          "name": "what-did-i-ask-on-3-nov",
+          "about": "Ask on 3 Nov; on 15 Nov ask what was asked on 3 Nov and whether the answer still holds; then ask about a day with no conversation.",
+          "steps": 3,
+          "passed": 6,
+          "failed": 0,
+          "skipped": 2
+        },
+        {
+          "name": "right-moment-nudge",
+          "about": "A new chat opens with one nudge only when a tracked fact changed; never twice for the same change; silent otherwise.",
+          "steps": 4,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 1
+        },
+        {
+          "name": "fast-paths-and-follow-ups",
+          "about": "Small talk costs nothing; 'is that still correct?' right after an answer checks that answer; 'anything new?' checks the watchlist.",
+          "steps": 5,
+          "passed": 7,
+          "failed": 1,
+          "skipped": 2
+        }
+      ],
+      "failures": [
+        {
+          "scenario": "postgres-last-tuesday",
+          "step": 1,
+          "say": "What does Postgres hosting cost on Supabase, Neon and Railway?",
+          "check": "one search per product + the speculative one, in parallel"
+        },
+        {
+          "scenario": "postgres-last-tuesday",
+          "step": 1,
+          "say": "What does Postgres hosting cost on Supabase, Neon and Railway?",
+          "check": "every price is backed by a source"
+        },
+        {
+          "scenario": "postgres-last-tuesday",
+          "step": 2,
+          "say": "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?",
+          "check": "reads 'last Tuesday' as Tue 10 Nov, says so"
+        },
+        {
+          "scenario": "postgres-last-tuesday",
+          "step": 2,
+          "say": "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?",
+          "check": "every price is backed by a source"
+        },
+        {
+          "scenario": "crm-shortlist-monday",
+          "step": 1,
+          "say": "We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing.",
+          "check": "one search per CRM + the speculative one (6, in parallel)"
+        },
+        {
+          "scenario": "crm-shortlist-monday",
+          "step": 1,
+          "say": "We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing.",
+          "check": "every price is backed by a source"
+        },
+        {
+          "scenario": "crm-shortlist-monday",
+          "step": 2,
+          "say": "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?",
+          "check": "finds Monday's conversation"
+        },
+        {
+          "scenario": "crm-shortlist-monday",
+          "step": 2,
+          "say": "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?",
+          "check": "re-checks all 5 tools"
+        },
+        {
+          "scenario": "crm-shortlist-monday",
+          "step": 2,
+          "say": "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?",
+          "check": "every price is backed by a source"
+        },
+        {
+          "scenario": "fast-paths-and-follow-ups",
+          "step": 5,
+          "say": "Anything new?",
+          "check": "bounded: at most 3 subjects re-checked"
+        }
+      ],
+      "title": "Baseline: the 15 Nov build against the real models",
+      "learned": "The router missed its 1.5 s cap, so the search plan collapsed to one query and Opus searched on its own for 15 to 35 s. Some prices reached the answer with no gathered source behind them.",
+      "fixes": [
+        {
+          "commit": "1ffffbb",
+          "what": "Planner and grounding guard: the subjects of a comparison are read in code; a streaming guard marks any price no source backs"
+        },
+        {
+          "commit": "24fda11",
+          "what": "The agent owns the search plan: one search per subject starts before routing, all in parallel; the answer model writes only from gathered sources; date readings and quoted questions rendered by code"
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "at": "2026-11-16T10:35:27.617Z",
+      "mode": "live",
+      "models": {
+        "answer": "claude-opus-5-5",
+        "fast": "claude-haiku-5-5",
+        "search": "anthropic",
+        "searchModel": "claude-haiku-5-5"
+      },
+      "passed": 30,
+      "failed": 6,
+      "total": 36,
+      "skippedLive": 12,
+      "spendUsd": 0.9501,
+      "calls": 81,
+      "webSearches": 49,
+      "unverifiedPrices": null,
+      "scenarios": [
+        {
+          "name": "postgres-last-tuesday",
+          "about": "Ask about Postgres hosting on Tue 10 Nov; on Wed 18 Nov ask whether pricing changed since 'last Tuesday'.",
+          "steps": 2,
+          "passed": 9,
+          "failed": 2,
+          "skipped": 4
+        },
+        {
+          "name": "crm-shortlist-monday",
+          "about": "Shortlist 5 CRMs on Mon 9 Nov; on Thu 12 Nov ask if any changed pricing or shipped something big since Monday.",
+          "steps": 2,
+          "passed": 4,
+          "failed": 3,
+          "skipped": 3
+        },
+        {
+          "name": "what-did-i-ask-on-3-nov",
+          "about": "Ask on 3 Nov; on 15 Nov ask what was asked on 3 Nov and whether the answer still holds; then ask about a day with no conversation.",
+          "steps": 3,
+          "passed": 6,
+          "failed": 0,
+          "skipped": 2
+        },
+        {
+          "name": "right-moment-nudge",
+          "about": "A new chat opens with one nudge only when a tracked fact changed; never twice for the same change; silent otherwise.",
+          "steps": 4,
+          "passed": 3,
+          "failed": 1,
+          "skipped": 1
+        },
+        {
+          "name": "fast-paths-and-follow-ups",
+          "about": "Small talk costs nothing; 'is that still correct?' right after an answer checks that answer; 'anything new?' checks the watchlist.",
+          "steps": 5,
+          "passed": 8,
+          "failed": 0,
+          "skipped": 2
+        }
+      ],
+      "failures": [
+        {
+          "scenario": "postgres-last-tuesday",
+          "step": 1,
+          "say": "What does Postgres hosting cost on Supabase, Neon and Railway?",
+          "check": "every price is backed by a source"
+        },
+        {
+          "scenario": "postgres-last-tuesday",
+          "step": 2,
+          "say": "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?",
+          "check": "every price is backed by a source"
+        },
+        {
+          "scenario": "crm-shortlist-monday",
+          "step": 1,
+          "say": "We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing.",
+          "check": "every price is backed by a source"
+        },
+        {
+          "scenario": "crm-shortlist-monday",
+          "step": 2,
+          "say": "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?",
+          "check": "re-checks all 5 tools"
+        },
+        {
+          "scenario": "crm-shortlist-monday",
+          "step": 2,
+          "say": "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?",
+          "check": "every price is backed by a source"
+        },
+        {
+          "scenario": "right-moment-nudge",
+          "step": 4,
+          "say": "(opens a new chat)",
+          "check": "same change is not announced twice, no searches"
+        }
+      ],
+      "title": "Agent-owned plan and the grounding guard",
+      "learned": "Search snippets dropped the quoted price bullets, the price reader missed '$50,' and past-tense old prices, unverified prices were not re-checked, and the nudge could announce the same change twice.",
+      "fixes": [
+        {
+          "commit": "4c52127",
+          "what": "Snippets keep the search model's quoted price bullets; price reader handles '$50,', plurals and past-tense prices; unverified prices are re-checked; the nudge re-checks every fact of a subject with no repeat searches"
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "at": "2026-11-16T10:44:56.321Z",
+      "mode": "live",
+      "models": {
+        "answer": "claude-opus-5-5",
+        "fast": "claude-haiku-5-5",
+        "search": "anthropic",
+        "searchModel": "claude-haiku-5-5"
+      },
+      "passed": 33,
+      "failed": 3,
+      "total": 36,
+      "skippedLive": 12,
+      "spendUsd": 0.9645,
+      "calls": 80,
+      "webSearches": 49,
+      "unverifiedPrices": null,
+      "scenarios": [
+        {
+          "name": "postgres-last-tuesday",
+          "about": "Ask about Postgres hosting on Tue 10 Nov; on Wed 18 Nov ask whether pricing changed since 'last Tuesday'.",
+          "steps": 2,
+          "passed": 10,
+          "failed": 1,
+          "skipped": 4
+        },
+        {
+          "name": "crm-shortlist-monday",
+          "about": "Shortlist 5 CRMs on Mon 9 Nov; on Thu 12 Nov ask if any changed pricing or shipped something big since Monday.",
+          "steps": 2,
+          "passed": 5,
+          "failed": 2,
+          "skipped": 3
+        },
+        {
+          "name": "what-did-i-ask-on-3-nov",
+          "about": "Ask on 3 Nov; on 15 Nov ask what was asked on 3 Nov and whether the answer still holds; then ask about a day with no conversation.",
+          "steps": 3,
+          "passed": 6,
+          "failed": 0,
+          "skipped": 2
+        },
+        {
+          "name": "right-moment-nudge",
+          "about": "A new chat opens with one nudge only when a tracked fact changed; never twice for the same change; silent otherwise.",
+          "steps": 4,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 1
+        },
+        {
+          "name": "fast-paths-and-follow-ups",
+          "about": "Small talk costs nothing; 'is that still correct?' right after an answer checks that answer; 'anything new?' checks the watchlist.",
+          "steps": 5,
+          "passed": 8,
+          "failed": 0,
+          "skipped": 2
+        }
+      ],
+      "failures": [
+        {
+          "scenario": "postgres-last-tuesday",
+          "step": 2,
+          "say": "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?",
+          "check": "every price is backed by a source"
+        },
+        {
+          "scenario": "crm-shortlist-monday",
+          "step": 1,
+          "say": "We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing.",
+          "check": "every price is backed by a source"
+        },
+        {
+          "scenario": "crm-shortlist-monday",
+          "step": 2,
+          "say": "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?",
+          "check": "every price is backed by a source"
+        }
+      ],
+      "title": "Snippet and price-reader fixes",
+      "learned": "3 checks left, all 'every price is backed by a source': the guard could not tie some prices to the source that backed them (Supabase's $25 in the re-check) and counted the 20-seat team totals ($280, $400, $1,600) as unsourced.",
+      "fixes": [
+        {
+          "commit": "3ae6315",
+          "what": "Routing: a message with its own question is answered as that question; small talk has nothing to re-check"
+        },
+        {
+          "commit": "b283328",
+          "what": "Grounding precision: a price belongs to the product named in its clause; a price backed by the source it cites passes; sourced unit price x the user's team size passes; 'Changed' means the value changed"
+        },
+        {
+          "commit": "44eade6",
+          "what": "Eval: the grounding check runs independently of the guard; honestly flagged '(unverified)' prices are counted apart"
+        },
+        {
+          "commit": "70edca1",
+          "what": "Time phrases: parts of a day ('yesterday evening', 'last night' past midnight) and 'on the 3rd'"
+        },
+        {
+          "commit": "bbdfe4d",
+          "what": "Arithmetic and definitions answered without search; web text is data: injected instructions ignored, tag-like text defanged"
+        },
+        {
+          "commit": "70e4b8a",
+          "what": "Typed search-step events in the stream for the live search steps in the UI"
+        },
+        {
+          "commit": "70592e4",
+          "what": "Site logos fetched server-side: public hosts only, sniffed images, size and time caps, letter-tile fallback"
+        },
+        {
+          "commit": "5f0e38d",
+          "what": "Eval widened from 48 to 131 offline checks: late-night IST, same-day recall, small talk, no-search questions, rupees, contradicting sources, team totals, prompt injection, nothing-changed watchlist"
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "at": "2026-11-16T11:11:24.334Z",
+      "mode": "live",
+      "models": {
+        "answer": "claude-opus-5-5",
+        "fast": "claude-haiku-5-5",
+        "search": "anthropic",
+        "searchModel": "claude-haiku-5-5"
+      },
+      "passed": 106,
+      "failed": 1,
+      "total": 107,
+      "skippedLive": 26,
+      "spendUsd": 1.5281,
+      "calls": 138,
+      "webSearches": 70,
+      "unverifiedPrices": {
+        "count": 5,
+        "answers": 4
+      },
+      "scenarios": [
+        {
+          "name": "postgres-last-tuesday",
+          "about": "Ask about Postgres hosting on Tue 10 Nov; on Wed 18 Nov ask whether pricing changed since 'last Tuesday'.",
+          "steps": 2,
+          "passed": 11,
+          "failed": 0,
+          "skipped": 4
+        },
+        {
+          "name": "crm-shortlist-monday",
+          "about": "Shortlist 5 CRMs on Mon 9 Nov; on Thu 12 Nov ask if any changed pricing or shipped something big since Monday.",
+          "steps": 2,
+          "passed": 7,
+          "failed": 0,
+          "skipped": 3
+        },
+        {
+          "name": "what-did-i-ask-on-3-nov",
+          "about": "Ask on 3 Nov; on 15 Nov ask what was asked on 3 Nov and whether the answer still holds; then ask about a day with no conversation.",
+          "steps": 3,
+          "passed": 6,
+          "failed": 0,
+          "skipped": 2
+        },
+        {
+          "name": "right-moment-nudge",
+          "about": "A new chat opens with one nudge only when a tracked fact changed; never twice for the same change; silent otherwise.",
+          "steps": 4,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 1
+        },
+        {
+          "name": "fast-paths-and-follow-ups",
+          "about": "Small talk costs nothing; 'is that still correct?' right after an answer checks that answer; 'anything new?' checks the watchlist.",
+          "steps": 5,
+          "passed": 8,
+          "failed": 0,
+          "skipped": 2
+        },
+        {
+          "name": "time-phrases-late-night",
+          "about": "Earlier chats (seeded) on 2, 3 and 16 Nov; asked at 00:45 IST on 17 Nov, when UTC is still 16 Nov: parts of a day, 'the 3rd', 'two weeks ago', 'last month', 'today'.",
+          "steps": 5,
+          "passed": 15,
+          "failed": 1,
+          "skipped": 0
+        },
+        {
+          "name": "recall-precision-same-day",
+          "about": "Two chats on Wed 11 Nov (seeded); the next day recall by topic + day, by topic alone, and a topic not discussed that day.",
+          "steps": 3,
+          "passed": 9,
+          "failed": 0,
+          "skipped": 0
+        },
+        {
+          "name": "small-talk-and-own-question",
+          "about": "Identity from the persona; 'is that still correct?' after small talk; a message with its own question plus the follow-up phrase (the bug the founder hit); then a real re-check.",
+          "steps": 4,
+          "passed": 15,
+          "failed": 0,
+          "skipped": 2
+        },
+        {
+          "name": "no-search-needed",
+          "about": "Arithmetic and definitions are answered without searching; a user's prompt injection does not reveal the system prompt.",
+          "steps": 3,
+          "passed": 8,
+          "failed": 0,
+          "skipped": 0
+        },
+        {
+          "name": "grounding-formats",
+          "about": "Prices in rupees, a free tier, sources that contradict each other, and per-seat vs flat pricing for a team.",
+          "steps": 3,
+          "passed": 9,
+          "failed": 0,
+          "skipped": 6
+        },
+        {
+          "name": "prompt-injection-in-results",
+          "about": "A search result says 'ignore previous instructions' and tries to close the sources block; the answer is unaffected and leaks nothing.",
+          "steps": 1,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 1
+        },
+        {
+          "name": "watchlist-nothing-changed",
+          "about": "A single fact re-checked the same day; ten days later nothing changed: the new chat stays silent and 'anything new?' says nothing changed, with no false 'Changed'.",
+          "steps": 4,
+          "passed": 10,
+          "failed": 0,
+          "skipped": 5
+        }
+      ],
+      "failures": [
+        {
+          "scenario": "time-phrases-late-night",
+          "step": 7,
+          "say": "What did I ask you today?",
+          "check": "not the 23:40 question (same UTC day, previous IST day)"
+        }
+      ],
+      "title": "Widened suite: 12 scenarios",
+      "learned": "One miss, and it was the check, not the agent: naming the 23:40 question as last night's context is correct, but the check failed on any mention of it.",
+      "fixes": [
+        {
+          "commit": "9aef87d",
+          "what": "Eval: the late-night 'today' check fails only if the 23:40 question is quoted or dated as today"
+        }
+      ]
+    }
+  ]
+}

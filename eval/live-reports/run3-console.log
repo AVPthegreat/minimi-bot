@@ -1,0 +1,88 @@
+
+> minimi-agent@1.0.0 eval:live
+> EVAL_LIVE=1 node --disable-warning=ExperimentalWarning --import tsx eval/run.ts
+
+
+## postgres-last-tuesday
+Ask about Postgres hosting on Tue 10 Nov; on Wed 18 Nov ask whether pricing changed since 'last Tuesday'.
+  1. "What does Postgres hosting cost on Supabase, Neon and Railway?" -> search | 4 searches | first status 40 ms, first text 13839 ms, first model token 13839 ms, total 20097 ms
+     ok intent is search
+     ok one search per product + the speculative one, in parallel
+     ok cites at least 3 sources
+     -  states Neon's price (skipped live)
+     ok facts stored for later re-checks
+     ok every price is backed by a source
+  2. "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?" -> verify | 6 searches | first status 5 ms, first text 4 ms, first model token 18436 ms, total 24141 ms
+     ok intent is verify
+     ok routed by rules (no router model call)
+     ok reads 'last Tuesday' as Tue 10 Nov, says so
+     ok quotes the earlier question
+     ok shows a then/now table
+     -  table: Neon: Launch plan -> Changed (skipped live)
+     -  table: Supabase: Pro plan -> Unchanged (skipped live)
+     -  new Neon price $15 with a source (skipped live)
+     FAIL every price is backed by a source
+
+## crm-shortlist-monday
+Shortlist 5 CRMs on Mon 9 Nov; on Thu 12 Nov ask if any changed pricing or shipped something big since Monday.
+  1. "We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing." -> search | 6 searches | first status 2 ms, first text 23619 ms, first model token 23619 ms, total 35379 ms
+     ok intent is search
+     ok one search per CRM + the speculative one (6, in parallel)
+     FAIL every price is backed by a source
+  2. "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?" -> verify | 10 searches | first status 1 ms, first text 1 ms, first model token 27481 ms, total 35037 ms
+     ok intent is verify
+     ok finds Monday's conversation
+     ok re-checks all 5 tools
+     -  table: Pipedrive: Advanced plan -> Changed (skipped live)
+     -  table: HubSpot: Sales Hub Starter plan -> Unchanged (skipped live)
+     -  reports the HubSpot launch since Monday (skipped live)
+     FAIL every price is backed by a source
+
+## what-did-i-ask-on-3-nov
+Ask on 3 Nov; on 15 Nov ask what was asked on 3 Nov and whether the answer still holds; then ask about a day with no conversation.
+  1. "How much is the Cloudflare Workers paid plan?" -> search | 1 searches | first status 1 ms, first text 10827 ms, first model token 10827 ms, total 12935 ms
+     ok intent is search
+     -  states the price (skipped live)
+  2. "What did I ask you on 3 November? Is your answer still correct today?" -> verify | 2 searches | first status 1 ms, first text 1 ms, first model token 15977 ms, total 19984 ms
+     ok intent is verify
+     ok quotes the 3 Nov question with its date
+     -  table: Cloudflare Workers: Paid plan -> Unchanged (skipped live)
+  3. "What did I ask you on 4 November?" -> recall | 0 searches | first status -, first text 1 ms, first model token 1612 ms, total 2717 ms
+     ok intent is recall
+     ok no web search
+     ok says honestly there is nothing on 4 Nov
+
+## right-moment-nudge
+A new chat opens with one nudge only when a tracked fact changed; never twice for the same change; silent otherwise.
+  1. "What does Postgres hosting cost on Supabase, Neon and Railway?" -> search | 4 searches | first status 1 ms, first text 13467 ms, first model token 13467 ms, total 21473 ms
+     ok intent is search
+  2. "(opens a new chat)" -> nudge | 0 searches
+     ok too soon to re-check: silent, no searches
+  3. "(opens a new chat)" -> nudge | 3 searches
+     -  one nudge about the Neon change (skipped live)
+     ok bounded: at most 3 searches
+  4. "(opens a new chat)" -> nudge | 0 searches
+     ok same change is not announced twice, no searches
+
+## fast-paths-and-follow-ups
+Small talk costs nothing; 'is that still correct?' right after an answer checks that answer; 'anything new?' checks the watchlist.
+  1. "hi" -> chat | 0 searches | first status -, first text 865 ms, first model token 865 ms, total 1308 ms
+     ok intent is chat
+     ok no web search
+     ok routed by rules
+  2. "How much is the Cloudflare Workers paid plan?" -> search | 1 searches | first status 1 ms, first text 7853 ms, first model token 7853 ms, total 10507 ms
+     ok intent is search
+  3. "Is that still correct?" -> verify | 2 searches | first status 1 ms, first text 1 ms, first model token 16415 ms, total 20068 ms
+     ok intent is verify
+     -  table: Cloudflare Workers: Paid plan -> Unchanged (skipped live)
+  4. "What does Postgres hosting cost on Supabase, Neon and Railway?" -> search | 4 searches | first status 1 ms, first text 17632 ms, first model token 17632 ms, total 24836 ms
+     ok intent is search
+  5. "Anything new?" -> updates | 6 searches | first status 1 ms, first text 11870 ms, first model token 17865 ms, total 21220 ms
+     ok intent is updates
+     -  table: Neon: Launch plan -> Changed (skipped live)
+     ok bounded: at most 3 subjects re-checked
+
+33 passed, 3 failed (live, search: anthropic)
+Spend: $0.9645 over 80 calls, 49 web searches (claude-haiku-5-5: 760586 in / 84558 out / 0 cache-read; claude-opus-5-5: 22673 in / 13063 out / 10517 cache-read)
+Results: /home/faurus/dev/minimi-agent/eval/results/live-2026-11-16T10-44-56-321Z.json and .md
+EXIT 1

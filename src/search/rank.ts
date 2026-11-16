@@ -21,17 +21,20 @@ export interface QueryRun {
 
 /**
  * Runs every query at once, each as its own search (latency is the slowest search, not the sum).
- * `onRun` fires as each one finishes, so the caller can show progress while the rest are running.
+ * `onStart` fires as each one starts and `onRun` as each one finishes, so the caller can show progress
+ * while the rest are running.
  */
 export async function runQueries(
   provider: SearchProvider,
   queries: Array<{ query: string; purpose: string; opts?: SearchOptions }>,
   signal?: AbortSignal,
   onRun?: (run: QueryRun, done: number, total: number) => void,
+  onStart?: (query: string) => void,
 ): Promise<QueryRun[]> {
   let done = 0;
   return Promise.all(
     queries.map(async ({ query, purpose, opts }) => {
+      onStart?.(query);
       const t0 = Date.now();
       let run: QueryRun;
       try {

@@ -1,0 +1,139 @@
+/* Design tokens, in minimi's own language: a clean white app, near-black text, one warm orange accent used
+   sparingly, black buttons, pill chips, soft grey borders and panels, floating on a warm peach-to-orange
+   "desert dune" backdrop. Dark is near-black with a faint purple glow. Light is the base; dark follows the
+   system unless the user picked a theme (html[data-theme]). Every text token passes WCAG AA on the
+   surface it sits on (numbers in DESIGN.md). */
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-latin-wght.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* Backdrop: a warm sky and three dune layers */
+  --bg: #fde8da;
+  --sky-top: #fff3ea;
+  --sky-bottom: #fdd6bb;
+  --dune-1: #fbc39b;
+  --dune-2: #f7a873;
+  --dune-3: #ee8a4b;
+  --dune-4: #dc6e31;
+  --glow: transparent;
+
+  /* Surfaces */
+  --window: rgba(255, 255, 255, 0.95);   /* the floating app window: white with a gentle frosted edge */
+  --window-solid: #ffffff;
+  --panel: #f7f7f7;                       /* sidebar, quiet panels */
+  --panel-2: #f2f2f2;                     /* chips, hovers, table heads */
+  --card: #ffffff;
+  --line: #e3e3e3;                        /* borders and dividers */
+  --line-soft: #ededed;
+  --blur: blur(18px) saturate(140%);
+
+  /* Text */
+  --text: #111111;
+  --text-2: #4a4a4a;                      /* 8.9:1 on white, 8.2:1 on #f7f7f7 */
+  --text-3: #666666;                      /* 5.7:1 on white, 5.3:1 on #f7f7f7 */
+
+  /* Accent: minimi orange. Orange fills carry black text; small orange text uses the darker ink. */
+  --orange: #ff8133;
+  --orange-ink: #b34700;                  /* 5.5:1 on white */
+  --orange-display: #d9590b;              /* 3.9:1 on white: large display text only */
+  --orange-soft: #fff3ea;
+  --orange-line: #ffd2b3;
+
+  /* Buttons */
+  --btn: #111111;
+  --btn-text: #ffffff;
+  --btn-hover: #2b2b2b;
+  --ring: #111111;
+
+  /* Status */
+  --ok: #0f6a3f;
+  --ok-soft: #e7f6ee;
+  --warn: #8f3b00;                        /* amber ink on its soft fill: 6.8:1 */
+  --warn-soft: #fff1e0;
+  --warn-line: #f8cf9d;
+  --bad: #a3171b;
+  --bad-soft: #fdecec;
+  --info: #3c3c3c;
+  --info-soft: #f5f5f5;
+
+  /* User bubble */
+  --user-bg: #111111;
+  --user-text: #ffffff;
+
+  /* Depth: soft and warm, never coloured */
+  --shadow-1: 0 1px 2px rgba(17, 17, 17, 0.06);
+  --shadow-2: 0 1px 2px rgba(17, 17, 17, 0.05), 0 8px 24px -10px rgba(17, 17, 17, 0.16);
+  --shadow-window: 0 2px 6px rgba(90, 40, 10, 0.08), 0 30px 80px -24px rgba(90, 40, 10, 0.38);
+
+  --radius-s: 9px;
+  --radius: 12px;
+  --radius-l: 16px;
+  --pill: 100px;
+
+  --fast: 150ms;
+  --med: 220ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0b0b0c; --sky-top: #0b0b0c; --sky-bottom: #0f0f10;
+    --dune-1: #131313; --dune-2: #161616; --dune-3: #191919; --dune-4: #1c1c1c;
+    --glow: rgba(118, 44, 170, 0.34);
+    --window: rgba(17, 17, 17, 0.93); --window-solid: #111111;
+    --panel: #151515; --panel-2: #232323; --card: #1a1a1a; --line: #2e2e2e; --line-soft: #262626;
+    --text: #f5f5f5; --text-2: #c4c4c4; --text-3: #a3a3a3;
+    --orange-ink: #ff9a5c; --orange-display: #ff8133; --orange-soft: rgba(255, 129, 51, 0.12); --orange-line: rgba(255, 129, 51, 0.35);
+    --btn: #f5f5f5; --btn-text: #111111; --btn-hover: #ffffff; --ring: #f5f5f5;
+    --ok: #6fdba5; --ok-soft: rgba(52, 199, 120, 0.14);
+    --warn: #ffb36b; --warn-soft: rgba(255, 140, 40, 0.14); --warn-line: rgba(255, 140, 40, 0.35);
+    --bad: #ff9b9b; --bad-soft: rgba(239, 68, 68, 0.15);
+    --info: #d6d6d6; --info-soft: #202020;
+    --user-bg: #f5f5f5; --user-text: #111111;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -12px rgba(0, 0, 0, 0.7);
+    --shadow-window: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 30px 90px -20px rgba(0, 0, 0, 0.85);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b0b0c; --sky-top: #0b0b0c; --sky-bottom: #0f0f10;
+  --dune-1: #131313; --dune-2: #161616; --dune-3: #191919; --dune-4: #1c1c1c;
+  --glow: rgba(118, 44, 170, 0.34);
+  --window: rgba(17, 17, 17, 0.93); --window-solid: #111111;
+  --panel: #151515; --panel-2: #232323; --card: #1a1a1a; --line: #2e2e2e; --line-soft: #262626;
+  --text: #f5f5f5; --text-2: #c4c4c4; --text-3: #a3a3a3;
+  --orange-ink: #ff9a5c; --orange-display: #ff8133; --orange-soft: rgba(255, 129, 51, 0.12); --orange-line: rgba(255, 129, 51, 0.35);
+  --btn: #f5f5f5; --btn-text: #111111; --btn-hover: #ffffff; --ring: #f5f5f5;
+  --ok: #6fdba5; --ok-soft: rgba(52, 199, 120, 0.14);
+  --warn: #ffb36b; --warn-soft: rgba(255, 140, 40, 0.14); --warn-line: rgba(255, 140, 40, 0.35);
+  --bad: #ff9b9b; --bad-soft: rgba(239, 68, 68, 0.15);
+  --info: #d6d6d6; --info-soft: #202020;
+  --user-bg: #f5f5f5; --user-text: #111111;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -12px rgba(0, 0, 0, 0.7);
+  --shadow-window: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 30px 90px -20px rgba(0, 0, 0, 0.85);
+}
+
+/* No backdrop blur (older browsers), or the user asked for less transparency: a solid window. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root, :root[data-theme] { --window: var(--window-solid); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root, :root[data-theme] { --window: var(--window-solid); }
+}
+@media (prefers-contrast: more) {
+  :root, :root[data-theme] { --window: var(--window-solid); --text-2: var(--text); --text-3: var(--text); --line: var(--text-3); }
+}

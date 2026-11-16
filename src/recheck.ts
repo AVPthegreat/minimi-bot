@@ -73,10 +73,10 @@ export function dedupeClaims(claims: ClaimRow[], max: number): ClaimRow[] {
 export async function recheckClaims(
   deps: RecheckDeps,
   claims: ClaimRow[],
-  opts: { nowMs: number; maxQueries: number; newsSinceDays?: number; signal?: AbortSignal; onRun?: Parameters<typeof runQueries>[3] },
+  opts: { nowMs: number; maxQueries: number; newsSinceDays?: number; signal?: AbortSignal; onRun?: Parameters<typeof runQueries>[3]; onStart?: Parameters<typeof runQueries>[4] },
 ): Promise<RecheckOutcome> {
   const queries = planRecheckQueries(claims, opts);
-  const runs = await runQueries(deps.search, queries, opts.signal, opts.onRun);
+  const runs = await runQueries(deps.search, queries, opts.signal, opts.onRun, opts.onStart);
   const subjects = [...new Set(claims.map((c) => c.subject))];
   const sources = rankSources(runs, subjects, opts.nowMs, 12);
   let found: Awaited<ReturnType<LLM["recheck"]>>;

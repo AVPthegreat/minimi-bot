@@ -1,0 +1,305 @@
+{
+  "mode": "live",
+  "at": "2026-11-16T10:15:51.947Z",
+  "models": {
+    "answer": "claude-opus-5-5",
+    "fast": "claude-haiku-5-5",
+    "search": "anthropic",
+    "searchModel": "claude-haiku-5-5"
+  },
+  "checks": {
+    "passed": 26,
+    "failed": 10
+  },
+  "spendUsd": 1.2808,
+  "spend": "$1.2808 over 43 calls, 56 web searches (claude-haiku-5-5: 405978 in / 33607 out / 0 cache-read; claude-opus-5-5: 21123 in / 14603 out / 262310 cache-read)",
+  "latency": [
+    {
+      "intent": "search",
+      "turns": 6,
+      "firstTokenP50": 27598,
+      "firstTokenP95": 37341,
+      "totalP50": 27606,
+      "totalP95": 37882,
+      "searchesAvg": 1
+    },
+    {
+      "intent": "verify",
+      "turns": 4,
+      "firstTokenP50": 19356,
+      "firstTokenP95": 31397,
+      "totalP50": 39590,
+      "totalP95": 65276,
+      "searchesAvg": 5.5
+    },
+    {
+      "intent": "recall",
+      "turns": 1,
+      "firstTokenP50": 718,
+      "firstTokenP95": 718,
+      "totalP50": 1652,
+      "totalP95": 1652,
+      "searchesAvg": 0
+    },
+    {
+      "intent": "chat",
+      "turns": 1,
+      "firstTokenP50": 836,
+      "firstTokenP95": 836,
+      "totalP50": 1193,
+      "totalP95": 1193,
+      "searchesAvg": 0
+    },
+    {
+      "intent": "updates",
+      "turns": 1,
+      "firstTokenP50": 20852,
+      "firstTokenP95": 20852,
+      "totalP50": 41728,
+      "totalP95": 41728,
+      "searchesAvg": 6
+    }
+  ],
+  "steps": [
+    {
+      "scenario": "postgres-last-tuesday",
+      "step": 1,
+      "say": "What does Postgres hosting cost on Supabase, Neon and Railway?",
+      "intent": "search",
+      "firstTokenMs": 33524,
+      "totalMs": 33535,
+      "searches": 1,
+      "failedChecks": [
+        "one search per product + the speculative one, in parallel",
+        "every price is backed by a source"
+      ],
+      "warnings": [
+        "I couldn't match $49.50 to a current source. Treat it as unverified."
+      ]
+    },
+    {
+      "scenario": "postgres-last-tuesday",
+      "step": 2,
+      "say": "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?",
+      "intent": "verify",
+      "firstTokenMs": 25703,
+      "totalMs": 42691,
+      "searches": 6,
+      "failedChecks": [
+        "reads 'last Tuesday' as Tue 10 Nov, says so",
+        "every price is backed by a source"
+      ],
+      "warnings": [
+        "I couldn't match $78.07 to a current source. Treat it as unverified.",
+        "I couldn't match $94.88 to a current source. Treat it as unverified."
+      ]
+    },
+    {
+      "scenario": "crm-shortlist-monday",
+      "step": 1,
+      "say": "We're a 20-person sales team. Compare HubSpot, Pipedrive, Salesforce, Zoho CRM and Close pricing.",
+      "intent": "search",
+      "firstTokenMs": 37341,
+      "totalMs": 37882,
+      "searches": 1,
+      "failedChecks": [
+        "one search per CRM + the speculative one (6, in parallel)",
+        "every price is backed by a source"
+      ],
+      "warnings": [
+        "I couldn't match $280 to a current source. Treat it as unverified.",
+        "I couldn't match $400 to a current source. Treat it as unverified.",
+        "I couldn't match $300 to a current source. Treat it as unverified.",
+        "I couldn't match $880 to a current source. Treat it as unverified.",
+        "I couldn't match $15 to a current source. Treat it as unverified.",
+        "I couldn't match $380 to a current source. Treat it as unverified.",
+        "I couldn't match $500 to a current source. Treat it as unverified.",
+        "I couldn't match $90 to a current source. Treat it as unverified.",
+        "I couldn't match $100 to a current source. Treat it as unverified.",
+        "I couldn't match $1,800 to a current source. Treat it as unverified.",
+        "I couldn't match $1,500 to a current source. Treat it as unverified.",
+        "I couldn't match $150 to a current source. Treat it as unverified.",
+        "I couldn't match $3,000 to a current source. Treat it as unverified.",
+        "I couldn't match $3,500 to a current source. Treat it as unverified.",
+        "I couldn't match $600 to a current source. Treat it as unverified."
+      ]
+    },
+    {
+      "scenario": "crm-shortlist-monday",
+      "step": 2,
+      "say": "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?",
+      "intent": "verify",
+      "firstTokenMs": 31397,
+      "totalMs": 65276,
+      "searches": 10,
+      "failedChecks": [
+        "finds Monday's conversation",
+        "re-checks all 5 tools",
+        "every price is backed by a source"
+      ],
+      "warnings": [
+        "I couldn't match $79 to a current source. Treat it as unverified.",
+        "I couldn't match $39 to a current source. Treat it as unverified.",
+        "I couldn't match $29 to a current source. Treat it as unverified.",
+        "I couldn't match $180 to a current source. Treat it as unverified.",
+        "I couldn't match $380 to a current source. Treat it as unverified.",
+        "I couldn't match $20 to a current source. Treat it as unverified.",
+        "I couldn't match $100 to a current source. Treat it as unverified."
+      ]
+    },
+    {
+      "scenario": "what-did-i-ask-on-3-nov",
+      "step": 1,
+      "say": "How much is the Cloudflare Workers paid plan?",
+      "intent": "search",
+      "firstTokenMs": 16354,
+      "totalMs": 16359,
+      "searches": 1,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match $5 to a current source. Treat it as unverified.",
+        "I couldn't match $0.30 to a current source. Treat it as unverified.",
+        "I couldn't match $0.02 to a current source. Treat it as unverified."
+      ]
+    },
+    {
+      "scenario": "what-did-i-ask-on-3-nov",
+      "step": 2,
+      "say": "What did I ask you on 3 November? Is your answer still correct today?",
+      "intent": "verify",
+      "firstTokenMs": 19356,
+      "totalMs": 39590,
+      "searches": 2,
+      "failedChecks": [],
+      "warnings": []
+    },
+    {
+      "scenario": "what-did-i-ask-on-3-nov",
+      "step": 3,
+      "say": "What did I ask you on 4 November?",
+      "intent": "recall",
+      "firstTokenMs": 718,
+      "totalMs": 1652,
+      "searches": 0,
+      "failedChecks": [],
+      "warnings": []
+    },
+    {
+      "scenario": "right-moment-nudge",
+      "step": 1,
+      "say": "What does Postgres hosting cost on Supabase, Neon and Railway?",
+      "intent": "search",
+      "firstTokenMs": 27598,
+      "totalMs": 27606,
+      "searches": 1,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match $0 to a current source. Treat it as unverified.",
+        "I couldn't match $0.00325 to a current source. Treat it as unverified.",
+        "I couldn't match $10 to a current source. Treat it as unverified.",
+        "I couldn't match $0.09 to a current source. Treat it as unverified.",
+        "I couldn't match $35 to a current source. Treat it as unverified.",
+        "I couldn't match $200 to a current source. Treat it as unverified."
+      ]
+    },
+    {
+      "scenario": "right-moment-nudge",
+      "step": 2,
+      "say": "(opens a new chat)",
+      "intent": "nudge",
+      "firstTokenMs": null,
+      "totalMs": 0,
+      "searches": 0,
+      "failedChecks": [],
+      "warnings": []
+    },
+    {
+      "scenario": "right-moment-nudge",
+      "step": 3,
+      "say": "(opens a new chat)",
+      "intent": "nudge",
+      "firstTokenMs": null,
+      "totalMs": 0,
+      "searches": 1,
+      "failedChecks": [],
+      "warnings": []
+    },
+    {
+      "scenario": "right-moment-nudge",
+      "step": 4,
+      "say": "(opens a new chat)",
+      "intent": "nudge",
+      "firstTokenMs": null,
+      "totalMs": 0,
+      "searches": 0,
+      "failedChecks": [],
+      "warnings": []
+    },
+    {
+      "scenario": "fast-paths-and-follow-ups",
+      "step": 1,
+      "say": "hi",
+      "intent": "chat",
+      "firstTokenMs": 836,
+      "totalMs": 1193,
+      "searches": 0,
+      "failedChecks": [],
+      "warnings": []
+    },
+    {
+      "scenario": "fast-paths-and-follow-ups",
+      "step": 2,
+      "say": "How much is the Cloudflare Workers paid plan?",
+      "intent": "search",
+      "firstTokenMs": 16358,
+      "totalMs": 16365,
+      "searches": 1,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match $5 to a current source. Treat it as unverified."
+      ]
+    },
+    {
+      "scenario": "fast-paths-and-follow-ups",
+      "step": 3,
+      "say": "Is that still correct?",
+      "intent": "verify",
+      "firstTokenMs": 14136,
+      "totalMs": 24071,
+      "searches": 4,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match $5 to a current source. Treat it as unverified.",
+        "I couldn't match $0.02 to a current source. Treat it as unverified."
+      ]
+    },
+    {
+      "scenario": "fast-paths-and-follow-ups",
+      "step": 4,
+      "say": "What does Postgres hosting cost on Supabase, Neon and Railway?",
+      "intent": "search",
+      "firstTokenMs": 29319,
+      "totalMs": 29325,
+      "searches": 1,
+      "failedChecks": [],
+      "warnings": [
+        "I couldn't match $25.25 to a current source. Treat it as unverified."
+      ]
+    },
+    {
+      "scenario": "fast-paths-and-follow-ups",
+      "step": 5,
+      "say": "Anything new?",
+      "intent": "updates",
+      "firstTokenMs": 20852,
+      "totalMs": 41728,
+      "searches": 6,
+      "failedChecks": [
+        "bounded: at most 3 subjects re-checked"
+      ],
+      "warnings": [
+        "I couldn't match $5 to a current source. Treat it as unverified."
+      ]
+    }
+  ]
+}
