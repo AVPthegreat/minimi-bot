@@ -1,5 +1,5 @@
 // The agent-loop parts: speculative search during routing, the answer model's own bounded searches,
-// batched Anthropic search, and the "current evidence only" price guard.
+// one Anthropic search call per query, and the "current evidence only" price guard.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Agent, type AgentEvent } from "../src/agent.ts";
@@ -119,21 +119,31 @@ test("re-check of facts the web no longer confirms never claims 'nothing changed
   assert.match(text, /I couldn't verify any of the 5 facts from Tue 10 Nov/);
 });
 
-test("Anthropic web search: all planned queries go out in one call and results map back per query", async () => {
+test("Anthropic web search: one small call per planned query, all in parallel, results and quotes per query", async () => {
   const calls: Array<Record<string, unknown>> = [];
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const pages: Record<string, { url: string; title: string; quote: string }> = {
+    "Supabase pricing": { url: "https://supabase.com/pricing", title: "Supabase Pricing", quote: "Pro $25/month" },
+    "Neon pricing": { url: "https://neon.com/pricing", title: "Neon Pricing", quote: "Launch plan $15/month" },
+  };
   const client = {
     messages: {
-      create: async (body: Record<string, unknown>) => {
-        calls.push(body);
+      create: async (body: { messages: Array<{ content: string }> }) => {
+        calls.push(body as never);
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((r) => setTimeout(r, 30));
+        inFlight--;
+        const q = body.messages[0]!.content.replace(/^Query: /, "");
+        const p = pages[q]!;
         return {
           stop_reason: "end_turn",
-          usage: { input_tokens: 100, output_tokens: 50, server_tool_use: { web_search_requests: 2 } },
+          usage: { input_tokens: 100, output_tokens: 50, server_tool_use: { web_search_requests: 1 } },
           content: [
-            { type: "server_tool_use", id: "t1", name: "web_search", input: { query: "Neon pricing" } },
-            { type: "web_search_tool_result", tool_use_id: "t1", content: [{ type: "web_search_result", url: "https://neon.com/pricing", title: "Neon Pricing", page_age: "November 14, 2026", encrypted_content: "x" }] },
-            { type: "server_tool_use", id: "t2", name: "web_search", input: { query: "Supabase pricing" } },
-            { type: "web_search_tool_result", tool_use_id: "t2", content: [{ type: "web_search_result", url: "https://supabase.com/pricing", title: "Supabase Pricing", page_age: null, encrypted_content: "y" }] },
-            { type: "text", text: "- Launch is $15", citations: [{ type: "web_search_result_location", url: "https://neon.com/pricing", title: "Neon Pricing", cited_text: "Launch plan $15/month", encrypted_index: "z" }] },
+            { type: "server_tool_use", id: "t1", name: "web_search", input: { query: q } },
+            { type: "web_search_tool_result", tool_use_id: "t1", content: [{ type: "web_search_result", url: p.url, title: p.title, page_age: "November 14, 2026", encrypted_content: "x" }] },
+            { type: "text", text: `- ${p.quote}`, citations: [{ type: "web_search_result_location", url: p.url, title: p.title, cited_text: p.quote, encrypted_index: "z" }] },
           ],
         };
       },
@@ -144,8 +154,9 @@ test("Anthropic web search: all planned queries go out in one call and results m
     { query: "Supabase pricing", purpose: "answer" },
     { query: "Neon pricing", purpose: "answer" },
   ]);
-  assert.equal(calls.length, 1, "one model call for both queries");
-  assert.equal((calls[0]!.tools as Array<{ max_uses: number }>)[0]!.max_uses, 2);
+  assert.equal(calls.length, 2, "one model call per query: the agent's plan is what runs");
+  assert.equal(maxInFlight, 2, "the calls run in parallel");
+  for (const c of calls) assert.equal((c.tools as Array<{ max_uses: number }>)[0]!.max_uses, 1);
   assert.equal(runs[0]!.results[0]!.url, "https://supabase.com/pricing");
   assert.equal(runs[1]!.results[0]!.url, "https://neon.com/pricing");
   assert.equal(runs[1]!.results[0]!.snippet, "Launch plan $15/month");

@@ -22,6 +22,4 @@ export interface SearchOptions {
 export interface SearchProvider {
   readonly name: string;
   search(query: string, opts?: SearchOptions): Promise<SearchResult[]>;
-  /** Optional: answer several queries in one round trip (one result list per query, in order). */
-  searchBatch?(items: Array<{ query: string; opts?: SearchOptions }>, signal?: AbortSignal): Promise<SearchResult[][]>;
 }

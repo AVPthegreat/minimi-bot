@@ -7,6 +7,7 @@ import type { ClaimRow, Store } from "./db.ts";
 import type { LLM, RecheckResult } from "./llm/types.ts";
 import { type QueryRun, type Source, rankSources, runQueries } from "./search/rank.ts";
 import type { SearchProvider } from "./search/types.ts";
+import { fairCap } from "./planner.ts";
 
 export interface RecheckDeps {
   store: Store;
@@ -54,27 +55,28 @@ export function planRecheckQueries(claims: ClaimRow[], opts: { maxQueries: numbe
   return queries;
 }
 
-/** Keep one claim per subject + attribute (the first, i.e. the caller's preferred one). */
+/**
+ * Keep one claim per subject + attribute (the first, i.e. the caller's preferred one), at most `max`,
+ * taken round-robin across subjects so every product of a shortlist gets re-checked.
+ */
 export function dedupeClaims(claims: ClaimRow[], max: number): ClaimRow[] {
   const seen = new Set<string>();
-  const out: ClaimRow[] = [];
-  for (const c of claims) {
+  const unique = claims.filter((c) => {
     const k = `${c.subject.toLowerCase()}|${c.attribute.toLowerCase()}`;
-    if (seen.has(k)) continue;
+    if (seen.has(k)) return false;
     seen.add(k);
-    out.push(c);
-    if (out.length >= max) break;
-  }
-  return out;
+    return true;
+  });
+  return fairCap(unique, max);
 }
 
 export async function recheckClaims(
   deps: RecheckDeps,
   claims: ClaimRow[],
-  opts: { nowMs: number; maxQueries: number; newsSinceDays?: number; signal?: AbortSignal },
+  opts: { nowMs: number; maxQueries: number; newsSinceDays?: number; signal?: AbortSignal; onRun?: Parameters<typeof runQueries>[3] },
 ): Promise<RecheckOutcome> {
   const queries = planRecheckQueries(claims, opts);
-  const runs = await runQueries(deps.search, queries, opts.signal);
+  const runs = await runQueries(deps.search, queries, opts.signal, opts.onRun);
   const subjects = [...new Set(claims.map((c) => c.subject))];
   const sources = rankSources(runs, subjects, opts.nowMs, 12);
   let found: Awaited<ReturnType<LLM["recheck"]>>;

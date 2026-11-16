@@ -13,7 +13,7 @@ export interface WatchConfig {
   enabled: boolean;
   /** Re-check a fact only if it is at least this many days old. */
   afterDays: number;
-  /** At most this many web searches per check (one per subject). */
+  /** At most this many subjects per check (one search per subject). */
   maxSearches: number;
 }
 
@@ -27,20 +27,36 @@ export interface WatchDeps extends RecheckDeps {
   tz: string;
 }
 
-/** Facts due for a re-check: newest interest first, one per subject + attribute. */
+/** Rows "anything new?" shows: changes first, then unverified, then unchanged (all facts are still re-checked). */
+export const MAX_ROWS_SHOWN = 6;
+/** A guard on model input size, not a display bound: facts of one subject read from its one search. */
+const MAX_FACTS_PER_SUBJECT = 8;
+
+/**
+ * Facts due for a re-check: newest interest first, one per subject + attribute, bounded in code to
+ * `maxSearches` subjects (one search each). EVERY due fact of a chosen subject is included: they share
+ * that subject's search, and a fact left out stays due, so the next new chat searched again (live
+ * 16 Nov, run 2: the 4th chat ran 2 searches after the 3rd had checked the same subjects).
+ */
 export function dueClaims(store: Store, nowMs: number, cfg: WatchConfig, force = false): ClaimRow[] {
   const olderThan = force ? nowMs + 1 : nowMs - cfg.afterDays * 86400000;
-  const all = store.watchCandidates(olderThan, 40);
-  // Bounded: keep only the claims of the first `maxSearches` subjects (one search per subject).
-  const subjects: string[] = [];
+  const all = store.watchCandidates(olderThan, 60);
+  const perSubject = new Map<string, number>();
   return all.filter((c) => {
-    const s = c.subject.toLowerCase();
-    if (!subjects.includes(s)) {
-      if (subjects.length >= cfg.maxSearches) return false;
-      subjects.push(s);
-    }
+    const s = c.subject.trim().toLowerCase();
+    const n = perSubject.get(s);
+    if (n === undefined && perSubject.size >= cfg.maxSearches) return false;
+    if ((n ?? 0) >= MAX_FACTS_PER_SUBJECT) return false;
+    perSubject.set(s, (n ?? 0) + 1);
     return true;
   });
+}
+
+/** The rows worth showing, at most `max`: changed, then couldn't-verify, then unchanged (original order within each). */
+export function rowsToShow<T extends { status: string }>(rows: T[], max = MAX_ROWS_SHOWN): T[] {
+  const rank = (r: T) => (r.status === "changed" ? 0 : r.status === "unverified" ? 1 : 2);
+  const keep = new Set([...rows].sort((a, b) => rank(a) - rank(b)).slice(0, max));
+  return rows.filter((r) => keep.has(r));
 }
 
 /**

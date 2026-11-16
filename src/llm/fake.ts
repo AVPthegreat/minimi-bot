@@ -1,8 +1,13 @@
 // A deterministic stand-in for Claude, used by `npm test`, the offline eval and FAKE_MODE.
 // It is deliberately simple: it only writes facts it can read in the sources (the same grammar
 // the fixture web uses), so the eval checks the agent's plumbing: routing, memory, time, re-checks.
+// Where the real models behaved in ways that hid bugs, the fake copies them (live run, 16 Nov):
+//   - with a web_search tool it searches itself, whatever the prefetched sources say;
+//   - it does not repeat the notes it is given, and it paraphrases earlier questions instead of
+//     quoting them (so dates and quotes must be rendered by code);
+//   - `slowRouter`: the router model misses its budget (the agent falls back), as Haiku did live.
 
-import { grammarClaims } from "../claims.ts";
+import { grammarClaims, parseValue, questionMultipliers, sameValue } from "../claims.ts";
 import type { NewClaim } from "../db.ts";
 import { rulesRoute, stopwordsTopic } from "../router.ts";
 import type { SearchProvider } from "../search/types.ts";
@@ -15,6 +20,7 @@ export class FakeLLM implements LLM {
   readonly name = "fake (deterministic, offline)";
 
   async route(input: RouteInput): Promise<Omit<RoutePlan, "via">> {
+    if (this.opts.slowRouter) throw new Error("router timeout");
     const rules = rulesRoute(input.text, input.timePhrases.length > 0, input.history.length > 0, input.rest);
     if (rules) return rules;
     const products = [...new Set((input.text.match(PRODUCT_RE) ?? []).filter((w) => !NOT_PRODUCTS.has(w)))];
@@ -24,12 +30,14 @@ export class FakeLLM implements LLM {
   }
 
   /** `search` lets the fake model run its own searches, like the real one's bounded web_search loop. */
-  constructor(private readonly search?: SearchProvider) {}
+  constructor(
+    private readonly search?: SearchProvider,
+    private readonly opts: { slowRouter?: boolean } = {},
+  ) {}
 
   async *streamAnswer(input: AnswerInput): AsyncIterable<AnswerEvent> {
-    // Bounded self-search: only when the prefetched sources state no facts at all.
-    const hasFacts = input.sources.some((s) => grammarClaims(s.snippet).length > 0);
-    if (input.intent === "search" && !hasFacts && input.maxSelfSearches > 0 && this.search) {
+    // Like the real model: given a search budget, it searches on its own before answering.
+    if (input.intent === "search" && input.maxSelfSearches > 0 && this.search) {
       const query = stopwordsTopic(input.question);
       yield { type: "searching", query };
       const found = (await this.search.search(query, { maxResults: 3, signal: input.signal })).filter((r) => grammarClaims(r.snippet).length);
@@ -54,9 +62,8 @@ export class FakeLLM implements LLM {
 
   private compose(input: AnswerInput): string {
     const out: string[] = [];
-    for (const n of input.notes) out.push(`_Note: ${n}_`);
     if (input.intent === "chat") {
-      out.push("Hi! I'm running in fake mode (no API keys), so my answers come from a small offline test web. Ask me about Postgres hosting or CRM pricing, then ask me about it again on another day.");
+      out.push("Hi! I'm Minimi, a chat assistant with web search and a dated memory of our conversations. I'm running in fake mode (no API keys), so my answers come from a small offline test web. Ask me about Postgres hosting or CRM pricing, then ask me about it again on another day.");
       return out.join("\n\n");
     }
     if (input.intent === "recall" || input.intent === "verify") {
@@ -65,8 +72,8 @@ export class FakeLLM implements LLM {
         return out.join("\n\n");
       }
       for (const t of input.memory) {
-        const gist = t.answer.split("\n").filter((l) => l.trim() && !l.startsWith("_Note")).slice(0, 4).join("\n");
-        out.push(`On ${t.when} you asked: "${t.question}"\n\nMy answer then, in short:\n${gist}`);
+        const gist = t.answer.split("\n").filter((l) => l.trim() && !l.startsWith("**") && !l.startsWith("You asked on")).slice(0, 4).join("\n");
+        out.push(`My answer then, in short:\n${gist}`);
       }
     }
     if (input.intent === "verify" && input.diff) {
@@ -94,6 +101,21 @@ export class FakeLLM implements LLM {
         else lines.push(`- ${s.title} [${s.n}]`);
       }
       out.push(lines.join("\n"));
+      // Like the real model (system prompt): totals shown with the sourced unit price, and disagreements named.
+      const facts = input.sources.slice(0, 6).flatMap((s) => grammarClaims(s.snippet).map((f) => ({ ...f, n: s.n })));
+      const seats = questionMultipliers(input.question)[0];
+      const extra: string[] = [];
+      for (const f of facts) {
+        const a = parseValue(f.value).amount;
+        if (seats && a !== null && /per (user|seat)/i.test(f.unit ?? "")) {
+          extra.push(`- ${f.subject} ${f.attribute.replace(/ price$/, "")} for ${seats} seats: ${seats} x ${f.value} [${f.n}] = $${(seats * a).toLocaleString("en-US")} per month`);
+        }
+      }
+      for (const [i, f] of facts.entries()) {
+        const other = facts.slice(i + 1).find((g) => g.subject === f.subject && g.attribute === f.attribute && !sameValue(g.value, f.value));
+        if (other) extra.push(`Sources disagree on ${f.subject} ${f.attribute}: ${f.value} [${f.n}] vs ${other.value} [${other.n}].`);
+      }
+      if (extra.length) out.push(extra.join("\n"));
     }
     return out.join("\n\n");
   }

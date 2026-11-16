@@ -13,7 +13,11 @@ export interface RecallResult {
   turns: PastTurn[];
   /** The window used, if the message named a time. */
   rangeLabel?: string;
-  /** Lines the answer must state (how a date was read, or that nothing was found then). */
+  /**
+   * Lines shown to the user above the answer, rendered by code: how the date was read ("Last Tuesday =
+   * Tue 10 Nov"), or that nothing was found then. The live answer model often skipped these when it was
+   * merely asked to state them, so they no longer depend on its wording.
+   */
   notes: string[];
 }
 
@@ -50,11 +54,15 @@ export function recall(
         if (hits.length) pick = hits;
         else notes.push(`On ${range.label} you didn't ask about "${terms.join(" ")}"; here is what you did ask then.`);
       }
-      if (ref.assumption) notes.push(i === 0 ? `${ref.assumption} I used ${range.label}.` : `${ref.assumption} You asked about this on ${range.label}, so I used that day.`);
+      const reading = ref.assumption
+        ? i === 0 ? ` ${ref.assumption} I used ${range.label}.` : ` ${ref.assumption} You asked about this on ${range.label}, so I used that day.`
+        : "";
+      notes.unshift(`${dateLine(ref.phrase, range.label)}${reading}`);
       return { turns: toTurns(pick), rangeLabel: range.label, notes };
     }
     // Nothing in the window: say so, and offer the closest match by topic from any date.
     const labels = ref.candidates.map((c) => c.label).join(" or ");
+    if (ref.candidates.length === 1) notes.push(dateLine(ref.phrase, labels));
     const near = terms.length ? store.searchUserMessages(terms, { excludeId: opts.currentMessageId, limit: 5 }).filter(isContentTurn) : [];
     if (near.length) {
       notes.push(`I have no conversation about this on ${labels}. The closest match is from ${formatLocal(near[0]!.created_at, opts.tz, opts.nowMs)}, so I used that.`);
@@ -74,6 +82,12 @@ export function recall(
   return { turns: [], notes: [terms.length ? `I couldn't find an earlier conversation about "${terms.join(" ")}".` : "I couldn't find an earlier conversation to check."] };
 }
 
+/** "Last Tuesday = Tue 10 Nov." ("on Monday" is shown as "Monday"). */
+function dateLine(phrase: string, label: string): string {
+  const said = phrase.replace(/^on\s+/i, "").trim();
+  return `**${said.charAt(0).toUpperCase()}${said.slice(1)} = ${label}.**`;
+}
+
 export function toPastTurn(store: Store, m: MessageRow, tz: string, nowMs: number): PastTurn {
   const answer = store.answerTo(m.id);
   return {
@@ -83,5 +97,6 @@ export function toPastTurn(store: Store, m: MessageRow, tz: string, nowMs: numbe
     // Old citation numbers point at old source lists; drop them so they are never re-linked to new sources.
     answer: answer ? answer.content.replace(/\s?\[\d{1,2}\]/g, "") : "(no answer was recorded)",
     claims: answer ? store.claimsFor(answer.id) : [],
+    intent: (JSON.parse(m.meta) as { intent?: string }).intent,
   };
 }

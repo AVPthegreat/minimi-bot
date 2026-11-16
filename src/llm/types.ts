@@ -37,6 +37,8 @@ export interface PastTurn {
   question: string;
   answer: string;
   claims: ClaimRow[];
+  /** How the earlier question was routed ("chat" = small talk: nothing factual to re-check). */
+  intent?: string;
 }
 
 export interface AnswerInput {
@@ -48,12 +50,17 @@ export interface AnswerInput {
   memory: PastTurn[];
   /** Set for "is it still correct?": the table the user has already been shown. */
   diff?: { rows: DiffRow[]; table: string; thenLabel: string };
-  /** One-liners the answer must state (e.g. how an ambiguous date was read). */
+  /** Instructions for this turn (e.g. "web search failed for every query; say so"). */
   notes: string[];
+  /**
+   * What the user already sees above the reply, rendered by code: how a date was read, the quoted
+   * earlier question(s), the re-check table. The model must not repeat or contradict it.
+   */
+  shown: string[];
   highStakes: boolean;
   /**
-   * How many web searches the answer model may run itself when the prefetched sources fall short
-   * (the bounded agent loop). 0 = answer from the given evidence only.
+   * How many web searches the answer model may run itself: only when the agent's own planned searches
+   * found nothing (the fallback loop). 0 = write only from the gathered sources (the normal case).
    */
   maxSelfSearches: number;
   signal?: AbortSignal;
