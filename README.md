@@ -1,7 +1,9 @@
 # minimi bot
 
 A chat agent that searches the web, remembers **what you asked and when**, re-checks its own past answers, and
-pings you with one line only when something you asked about has actually changed.
+pings you with one line only when something you asked about has changed enough to matter now.
+
+**Live demo: https://minimi.faurus.app**
 
 ![minimi bot: the home screen](docs/screens/home.jpg)
 
@@ -22,11 +24,14 @@ Has any pricing changed since then?". The report page is at http://localhost:300
   dates in code, and the answer shows how it read them ("Last Tuesday = Tue 10 Nov") and quotes what you asked then.
 - **Re-verification.** Facts from answers are saved as rows (product, plan, price, source, date). "Is that still
   correct?" re-checks exactly those facts and shows a then/now table with Changed and Unchanged per row.
-- **Grounding in code.** One web search per product runs in parallel, and the answer model writes only from those
-  sources. While it streams, a guard checks every price against the sources; a price no source backs is shown as
-  "(unverified)", never as fact.
-- **The right moment.** Facts you asked about form a watchlist. A new chat quietly re-checks the ones older than 3 days and
-  opens with one line only if something changed. No change, no message.
+- **Grounding for prices and numbers.** One web search per product runs in parallel, and the answer model writes from
+  those sources (it may search up to 3 more times itself if they fall short). While it streams, a guard in code checks
+  every price and number against the sources; one no source backs is shown as "(unverified)", never as fact. Other
+  statements are cited, but not checked in code.
+- **The right moment.** Facts you asked about form a watchlist. A new chat quietly re-checks the ones older than 3 days.
+  A change is announced only if importance (watched, compared, asked again) × size of the change × timeliness (decays
+  with time, urgent near a date you mentioned) passes a threshold, and the line says why: "You compared Neon with
+  Supabase and Railway on Tue 10 Nov; its Launch plan price dropped 21%". Otherwise, no message.
 
 ![A re-check: the date reading, the quoted question and the then/now table](docs/screens/recheck.jpg)
 
@@ -47,10 +52,11 @@ injection in search results, a watchlist where nothing changed).
 - On the 5 scenarios of run 1, run 4 passed **36 / 36**.
 - The one run-4 miss was the check, not the agent: naming the 23:40 question as last night's context is correct, but
   the check failed on any mention of it. The check is now precise (commit `9aef87d`).
-- Offline: **131 / 131** eval checks (12 multi-day scenarios on a fake clock) and **127 / 127** tests in `npm test`.
+- Offline: **133 / 133** eval checks (12 multi-day scenarios on a fake clock) and **135 / 135** tests in `npm test`.
 - Total live spend for all four runs: **$4.72**.
-- Medians in run 4: a web-search answer starts after 12.8 s and finishes in 19.6 s; a memory answer finishes in 2.9 s
-  (its date reading and quoted question appear at once).
+- Measured medians in run 4 (the live run, before the answer model could search on its own): a web-search answer
+  starts after 12.8 s and finishes in 19.6 s; a memory answer finishes in 2.9 s (its date reading and quoted question
+  appear at once).
 
 The in-app report at **[/report](http://localhost:3000/report)** has the score timeline, every failed check per run
 with the commit that fixed it, a scenario-by-scenario table, latency by question type, the architecture and the
@@ -86,15 +92,15 @@ flowchart LR
   server's own logo proxy, so the browser never calls a third party.
 
 More in [DESIGN.md](DESIGN.md) (one page), the [High-Level Design](docs/HLD.md) (requirements, components, request
-lifecycles, security, cost, scaling, trade-offs), the [Low-Level Design](docs/LLD.md) (module by module: algorithms,
-schema, stream events, errors, configuration, test map) and [EXPLAIN.md](EXPLAIN.md).
+lifecycles, security, cost, scaling, trade-offs) and the [Low-Level Design](docs/LLD.md) (module by module: algorithms,
+schema, stream events, errors, configuration, test map).
 
 ## Testing
 
 | Command | What it does |
 |---|---|
-| `npm test` | 127 tests: unit tests and the offline scenarios (no network, no keys) |
-| `npm run eval` | The multi-day eval with a readable report: 131 checks offline (`EVAL_VERBOSE=1` prints answers) |
+| `npm test` | 135 tests: unit tests and the offline scenarios (no network, no keys) |
+| `npm run eval` | The multi-day eval with a readable report: 133 checks offline (`EVAL_VERBOSE=1` prints answers) |
 | `npm run eval:live` | The same scenarios against the real models and web search, capped at `MAX_SPEND_USD` (default $5) |
 | `npm run report` | Rebuilds the report data from `eval/live-reports/` and the offline runs |
 | `npm run typecheck` | `tsc --noEmit`, strict |

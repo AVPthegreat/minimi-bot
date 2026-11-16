@@ -1,91 +1,76 @@
 # Design
 
-A web-search chat agent that remembers **what you asked and when**. Time and memory are data, not chat history:
-"what did I ask on 3 November, is it still correct?" is a lookup plus a re-check of exactly the facts given then.
+minimi bot is a web-search chat agent that remembers **what you asked and when**, re-checks its own past answers,
+and speaks first only when a change matters to you now. Depth: [HLD](docs/HLD.md), [LLD](docs/LLD.md),
+[report](public/report/data.json) (`/report` in the app).
+
+## Why a hybrid loop
+
+A pure agent loop searches one call at a time: slow, costly, hard to test. A pure pipeline cannot follow up. So
+**code plans the first round** (one search per subject a comparison names, in parallel), **then a bounded agentic
+loop**: the answer model may call `web_search` itself if those sources fall short, at most `ANSWER_MAX_SEARCHES` = 3
+times and within the spend meter. Every result is grounded the same way.
+
+## Turn flow
 
 ```
-message ─► save with timestamp ─► time phrases resolved in code ─┬─► router: rules, else small model (1.5 s cap)
-     search plan in code: the question + one query per subject ──┘   (started at once; cancelled if no search needed)
-  chat    ─ no evidence
-  recall  ─ SQLite: time window + FTS5 keywords ─► code shows "Last Tuesday = Tue 10 Nov" + the quoted question
-  search  ─ one search per subject, in parallel ─► rank (official, fresh, every subject keeps its best page)
-  verify  ─ recall ─► stored claims ─► per-subject + "news since" searches ─► small model reads values ─► diff in code
-        ─► answer model writes only from those sources, cites [n] ─► grounding guard while streaming ─► save
-        ─► extract claims under the planned subjects (background) ─► watchlist
+message ─► saved with its time ─► time phrases → dates (code) ─► router: rules, else small model
+  chat    ─► answer
+  recall  ─► SQLite: time window + FTS5 ─► "Last Tuesday = Tue 10 Nov" + the quoted question
+  search  ─► planned searches (parallel) ─► answer model ⇄ web_search (≤ 3) ─► grounding guard ─► stream
+  verify  ─► recall ─► stored claims ─► re-search ─► small model reads values ─► then/now diff in code
+                                                       └► claims extracted in the background ─► watchlist
 ```
 
-**Memory.** One SQLite file (built into Node 22): sessions, messages (UTC, shown in your timezone), every search
-(query, provider, results, time), and **claims**: checkable facts from answers (subject, attribute, value, unit,
-source, date, re-check chain).
+## Memory and claims
 
-**Time.** "Yesterday", "on Monday", "3 November", "two weeks ago" resolve in code against an injectable clock.
-"Last Tuesday" on a Wednesday gives two candidate days; memory uses the one with a matching conversation.
+Time is data: messages carry their time, and "last Tuesday" or "on the 3rd" become dates in code against an
+injectable clock (an ambiguous phrase uses the reading with a matching conversation). Facts are rows: prices and plans
+from answers become claims (subject, attribute, value, unit, source, date, what they supersede). "Is it still
+correct?" re-searches exactly those facts; the then/now verdict is computed in code.
 
-**The agent owns the plan.** A comparison names its subjects ("Supabase, Neon and Railway"), so code reads them
-and starts one search per subject, plus the raw question, before the router model has answered; the router only adds
-queries when code finds no list. With only an Anthropic key, each query is its own small Haiku call with exactly one
-`web_search`, all in parallel. The answer model gets no search tool when those searches found sources: it writes only
-from them. It searches itself (at most 3) only when the planned searches found nothing. (Live on 16 Nov the router
-missed its 1.5 s cap, the plan collapsed to one query, and Opus searched on its own for 15-35 s.)
+## The right moment
 
-**Getting it right.** Official and recent pages rank first. Grounding is enforced in code while the answer streams:
-a sentence or table row with a price is held until complete and checked against the gathered sources (amount,
-currency, the product it belongs to: named in its clause, else the last one named, or in the source it cites); a total is accepted only as a sourced price times a number
-the user gave ("20 seats x $14 [2] = $280"); an earlier answer backs a price only when stated as past ("was $19").
-Snippets are the search model's verbatim citations plus its quoted bullets for URLs it returned. An unsupported
-price is shown as "$X (unverified)", warned about, and tracked only as unverified, so the next re-check settles it. How a date was read, the quoted earlier question and the then/now table are rendered by code,
-so they never depend on the model's wording; the summary never claims "nothing changed" unless every fact was verified.
+Stated facts form a watchlist. A new chat quietly re-checks up to 3 subjects older than 3 days. A change becomes a
+nudge only if its score passes 0.15:
 
-**The right moment** (minimi's idea). Stated facts are a watchlist. A new chat quietly re-checks up to 3 subjects
-(all their facts share one search each) older than 3 days; "anything new?" shows at most 6 rows, changes first. If one changed, the chat opens with one
-line; if not, silence. Never twice and never lost: a change is saved only with the nudge that shows it, so a nudge
-dropped (you typed first) or cancelled (12 s, typing in the demo) leaves it for the next chat. Off: `WATCH_ENABLED=0`.
+**score = importance × magnitude × timeliness**
+
+- *Importance*: asked once 0.3; compared or shortlisted +0.25; asked in more than one message +0.25; "watch it for
+  me" +0.5 (cap 1).
+- *Magnitude*: relative price change, 20% or more = 1; a plan, feature or unit change 0.6; discontinued 1.
+- *Timeliness*: halves every 14 days since you last asked; a watched fact keeps 0.5; a date you mentioned within
+  14 days makes it 1.
+
+Highest score first, one nudge per new chat, saying why: "You compared Neon with Supabase and Railway on Tue 10 Nov;
+its Launch plan price dropped 21%". A change is saved only with the nudge that shows it: never twice, never lost if
+you type first. Smaller changes wait for "anything new?". Weights: `src/rightmoment.ts`.
+
+## Grounding (honest scope)
+
+While the answer streams, every **price and number** is checked in code against the sources (amount, currency,
+product); a total must be a sourced price times your number. Unbacked ones show as "(unverified)". Other statements
+are cited, not checked in code.
+
+## Cost and latency
+
+Measured in live run 4 (16 Nov, 39 turns, before the agentic loop was added): web answers start after **12.8 s** and
+finish in **19.6 s** (medians); memory answers finish in **2.9 s**, their date reading and quote at once. Run 4 cost
+$1.53, about 4 cents a turn. A spend meter caps every run.
+
+## Testing
+
+Model, search and clock have fakes: 12 multi-day scenarios replay offline against a fixture web whose prices change
+on known dates (`npm run eval`). Four live runs scored 72%, 83%, 92%, then 106 / 107; every miss became a fix and a
+test.
+
+## Decisions
 
 | Decision | Why | Rejected |
 |---|---|---|
-| Rules, then a small router, with a speculative search started in parallel | Small talk and memory questions need no web; a web question doesn't wait for routing (1.5 s cap) | Always search: slower and noisy. Router first: adds up to 4 s |
-| Claims as rows, diff in code | Per-fact changed/unchanged/unverified | A model comparing prose: misses changes, invents some |
-| SQLite FTS5 + time windows | Exact and explainable, no extra service | Vector DB: embeddings for a problem that is mostly *when* |
-| Plain Anthropic SDK | Every prompt and step visible and testable | LangChain: hidden control flow |
-| Search behind an interface, one call per query | Tavily: fast, dated snippets. **Only an Anthropic key:** one small Haiku `web_search` call per subject, in parallel, so the plan that runs is ours | One batched call: the model chose its own searches, one after another |
-| Fakes for model, search and clock, made as unhelpful as the live models | The multi-day eval runs offline in `npm test` and catches what live runs caught | Only live tests: flaky and paid |
-
-Models: `claude-opus-5-5` streams answers (effort low for chat/recall, medium for web); `claude-haiku-5-5` routes,
-searches (Anthropic-only path), extracts claims and reads re-checked values (JSON schema output).
-
-**What the user sees when** (targets, not yet measured live with this flow; `npm run eval:live` writes p50/p95 of
-first status, first text and first model token to `eval/results/`). ≈0 s: "Searching the web for Supabase, Neon,
-Railway (4 searches in parallel)"; then one line per finished search. Verify/recall: the date reading and the quoted
-question at once, the then/now table when the re-check ends. Search answers: Opus's first token ≈1-2 s after the
-slowest search (Tavily ≈1 s; Anthropic search ≈3-8 s), then tokens as they arrive (a price line waits for its end).
-Live 16 Nov, before this change: 16-37 s to the first word on search turns.
-
-**Web UI** (`public/`, plain ES modules, no framework or build step). `api.js` owns fetch, the SSE parser and typed
-errors; `state.js` is one observable store; `chat.js` turns stream events into view calls (busy, stop, retry);
-`render/*` only draw (messages, search steps, sources, sidebar, home, composer, banner); `markdown.js` escapes every
-character before adding its own tags. The stream carries typed `search` events (query, running/done/failed/cancelled,
-result count, the product's site) next to the old status lines, so older clients still work. Logos come from our own
-`GET /api/logo` (`src/logo.ts`): fetched server-side over https from public addresses only (checked at connect time),
-sniffed as raster images, size/time capped, cached in memory and on disk, a letter tile otherwise. The look follows
-minimi's own site: a white app window on a warm dune backdrop, near-black text, black buttons, pill chips, sources as
-app-panel items (site · date, bold title, grey quote line), one orange accent; dark is near-black with a faint purple glow.
-Text tokens pass WCAG AA on their surfaces (ratios in `public/css/tokens.css`); the window turns solid under
-`prefers-reduced-transparency`. The Report page (`/report`) draws `public/report/data.json`, built by `npm run report`.
-
-**Hosted demo** (`DEMO_MODE=1`, `src/app.ts` + `src/demo/`; off = the single-user app, same routes). Each route asks
-`ctx(req)` for the caller's agent: a random 128-bit visitor id in an HMAC-signed HttpOnly cookie maps to that visitor's
-own SQLite file, clock and Agent (opened lazily, LRU of 200, swept after `DEMO_TTL_DAYS`). One `LedgerMeter` (same
-prices as `usage.ts`) writes every call's cost to `demo.db` and refuses paid calls at `DEMO_BUDGET_USD`; chat then sends
-a typed `demo_budget` event. Per-visitor daily cap, per-IP token bucket, 1 answer per visitor / 8 globally, 2,000-char
-messages, CSP and frame-ancestors none. Runbook: `deploy/README-demo.md`. Rejected: one shared memory (privacy), accounts (friction).
-
-**Eval.** `eval/scenarios.ts` replays multi-day conversations on a fake clock against a fixture web whose prices
-change on known dates: the three example questions, nudges, time phrases (late night IST, "the 3rd", "yesterday
-evening"), same-day recall, small talk vs. a new question, rupees, contradicting sources, team totals, prompt
-injection, nothing-changed: 131 checks offline, in `npm test`. "No price shown as fact without a source" is checked
-independently of the guard; honest "(unverified)" prices are counted apart. Plus a test per live failure.
-
-**With another week:** read full official pages and require two sources for high-stakes numbers; a macOS background
-scheduler for nudges; embeddings for paraphrased recall; a nightly live eval graded by a judge model.
-
-Detail: [docs/HLD.md](docs/HLD.md) (architecture, security, cost, scaling) and [docs/LLD.md](docs/LLD.md) (algorithms, schema, events).
+| Planned parallel round, then a bounded tool loop | Fast and predictable, can still follow up | Pure agent loop: slow, serial, costly |
+| Claims as rows, diff in code | Per-fact verdicts that can be tested | A model comparing prose |
+| SQLite FTS5 + time windows | Recall is mostly *when*; exact, no extra service | Vector DB |
+| Scored nudges, silent by default | A "no news" ping teaches you to ignore it | Nudge on any change |
+| Plain Anthropic SDK | Every prompt and step visible | Agent frameworks: hidden control flow |
+| Fakes as unhelpful as the live models | The offline eval catches what live runs caught | Live-only tests: flaky, paid |
