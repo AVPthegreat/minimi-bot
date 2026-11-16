@@ -6,7 +6,7 @@
 import type { LLM, RouteInput, RoutePlan } from "./llm/types.ts";
 
 const CHITCHAT =
-  /^\s*(hi|hello|hey|yo|hiya|thanks|thank you|thx|ok|okay|cool|great|nice|good (morning|afternoon|evening|night)|bye|see you|who are you|what can you do)\b[\s!.?,a-z]{0,20}$/i;
+  /^\s*(hi|hello|hey|yo|hiya|thanks|thank you|thx|ok|okay|cool|great|nice|good (morning|afternoon|evening|night)|bye|see you|who are you|what are you|who (made|built|created|trained) you|what can you do)\b[\s!.?,a-z]{0,20}$/i;
 
 const RECALL =
   /\b(what (did|have) (i|we) (ask|asked|say|said|talk|talked|discuss|discussed)|what (i|we) (asked|said|talked about|discussed)|did i (ask|mention|say)|when did i (ask|mention)|what (was|were) (my|our) (question|questions)|what did you (say|tell|answer|recommend)|remind me what|what have we (talked|discussed))\b/i;
@@ -48,12 +48,39 @@ export function rulesRoute(text: string, hasTimeRef: boolean, hasHistory: boolea
     return { intent: "updates", memoryQuery: "", searchQueries: [], sinceDays: 0, highStakes: false };
   }
   const verify = VERIFY.test(text);
+  // A message that carries its own new question next to the follow-up phrase ("What does X cost?" then
+  // "Is that still correct?") is that new question, not a re-check of the previous answer (live bug).
+  const own = verify ? ownQuestion(text) : null;
+  if (own) {
+    return { intent: "search", memoryQuery: stopwordsTopic(own), searchQueries: [own.slice(0, 300)], sinceDays: 0, highStakes: /pric|cost|\$|fee|plan/i.test(own) };
+  }
   const pointsBack = hasTimeRef || PAST_POINTER.test(text) || (hasHistory && /\b(that|it|this|those|them)\b/i.test(text));
   if (verify && pointsBack) {
     return { intent: "verify", memoryQuery: topic, searchQueries: [], sinceDays: 0, highStakes: /pric|cost|\$|plan/i.test(text) };
   }
   if (RECALL.test(text)) {
     return { intent: "recall", memoryQuery: topic, searchQueries: [], sinceDays: 0, highStakes: false };
+  }
+  return null;
+}
+
+/**
+ * The new question inside a message that also says "is that still correct?", or null when the message
+ * is essentially the follow-up itself. A part counts as a new question when it is phrased as one (ends
+ * with "?" or starts "compare"), names a topic of its own, and is neither a follow-up nor about memory
+ * ("What did I ask on 3 Nov? Is it still correct?" stays a re-check).
+ */
+export function ownQuestion(text: string): string | null {
+  const parts = text
+    .split(/["“”]|(?<=[?!.])\s+/)
+    .map((p) => p.trim().replace(/^(then|and|also|so|plus|after that)\b[\s,:]*/i, "").trim())
+    .filter(Boolean);
+  if (parts.length < 2) return null;
+  for (const p of parts) {
+    if (VERIFY.test(p) || RECALL.test(p) || UPDATES.test(p) || PAST_POINTER.test(p)) continue;
+    if (!/\?\s*$/.test(p) && !/^compare\b/i.test(p)) continue;
+    if (stopwordsTopic(p).split(/\s+/).filter(Boolean).length < 2) continue;
+    return p;
   }
   return null;
 }

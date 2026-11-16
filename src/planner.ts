@@ -15,7 +15,7 @@ const SEP = String.raw`(?:\s*,\s*(?:and\s+|or\s+)?|\s+(?:and|or|vs\.?|versus)\s+
 const LIST_RE = new RegExp(`${NAME}(?:${SEP}${NAME})+`, "g");
 
 // Capitalised words that start sentences or name days, not products.
-const NOT_NAMES = new Set(
+export const NOT_NAMES = new Set(
   ("I We We're Our My Me It Its They And Or For In Of What Which How Compare Comparing Is Are Has Have On Last The Tell Should " +
     "Give Can Do Does Please Show List Between Who Why When Where Monday Tuesday Wednesday Thursday Friday Saturday Sunday " +
     "January February March April May June July August September October November December").split(" "),

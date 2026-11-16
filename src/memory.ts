@@ -97,5 +97,6 @@ export function toPastTurn(store: Store, m: MessageRow, tz: string, nowMs: numbe
     // Old citation numbers point at old source lists; drop them so they are never re-linked to new sources.
     answer: answer ? answer.content.replace(/\s?\[\d{1,2}\]/g, "") : "(no answer was recorded)",
     claims: answer ? store.claimsFor(answer.id) : [],
+    intent: (JSON.parse(m.meta) as { intent?: string }).intent,
   };
 }
