@@ -43,7 +43,6 @@ code { font-family: var(--mono); font-size: 0.88em; padding: 1px 6px; border-rad
 .dune-band .wrap { position: relative; z-index: 1; }
 .window { max-width: 920px; margin: 0 auto; padding: 14px 22px 18px; border-radius: var(--radius-l); background: var(--window); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); border: 1px solid rgba(255, 255, 255, 0.7); box-shadow: var(--shadow-window); }
 :root[data-theme="dark"] .window { border-color: var(--line); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .window { border-color: var(--line); } }
 .window-bar { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text-3); }
 .window-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); box-shadow: 14px 0 0 var(--line), 28px 0 0 var(--line); margin-right: 30px; }
 .hero-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }

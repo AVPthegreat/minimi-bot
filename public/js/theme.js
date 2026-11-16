@@ -1,11 +1,10 @@
-// Light / dark: follows the system until the user picks one; the pick is remembered on this device.
+// Light / dark: light for everyone by default (the system preference is not followed); the user's pick is
+// remembered on this device.
 import { ICONS } from "./icons.js";
 
 const KEY = "minimi:theme";
 const root = document.documentElement;
-const system = () => (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-
-export const currentTheme = () => root.dataset.theme || system();
+export const currentTheme = () => (root.dataset.theme === "dark" ? "dark" : "light");
 
 function save(theme) {
   try {
@@ -15,7 +14,7 @@ function save(theme) {
   }
 }
 
-/** Wires the toggle button; keeps its icon and label right when the system theme changes. */
+/** Wires the toggle button and keeps its icon and label right. */
 export function initTheme(button) {
   const paint = () => {
     const next = currentTheme() === "dark" ? "light" : "dark";
@@ -31,6 +30,5 @@ export function initTheme(button) {
     paint();
     setTimeout(() => root.classList.remove("theme-switching"), 250);
   });
-  window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", paint);
   paint();
 }

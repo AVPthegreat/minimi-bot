@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>minimi bot report</title>
   <meta name="description" content="What minimi bot is, how it works, and the numbers from its live and offline test runs.">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="light">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="preload" href="/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/css/tokens.css">
@@ -176,6 +176,7 @@
       <div>
         <h2>Security</h2>
         <ul class="panel-list compact">
+          <li><strong>Private chats in the hosted demo.</strong> Each browser gets its own signed cookie and its own store: only you can see your chats, and they are deleted after 7 idle days (the default).</li>
           <li><strong>No keys in the browser.</strong> API keys live in the server's environment; the page talks only to its own server.</li>
           <li><strong>Cross-site requests refused.</strong> A POST from another origin, or without a JSON body, gets 403 or 415, so another site cannot spend the budget or move the demo clock.</li>
           <li><strong>SSRF-safe logo proxy.</strong> Site logos are fetched by the server over https from public addresses only (checked at connect time), size and time capped, sniffed as images and served with a strict content policy; otherwise a letter tile.</li>
