@@ -109,6 +109,22 @@ per subject, the rest stayed due and the next chat searched again: now every fac
 fakes as unhelpful as the real ones and added a test per live failure. "Where does grounding live?" In code: a
 streaming guard, not a prompt rule. "Who decides what to search?" The agent, in code; models only fill gaps.
 
+## The web page (public/)
+
+No framework and no build step: the browser loads small ES modules. `api.js` talks to the server (and reads the
+stream), `state.js` holds the one store, `chat.js` runs a turn (send, stop, retry, errors), `render/*.js` draw, and
+`markdown.js` turns answers into HTML only after escaping every character, so model text can never inject markup.
+The page shows the agent's work because the server now sends a typed `search` event per web search (started,
+finished with N results, failed, cancelled) and the product's site, so each search appears with its logo, a spinner,
+then a check. Logos are fetched by our server, not the browser (`src/logo.ts`): public hosts only, real images only,
+cached. The then/now table, the "Last Tuesday = Tue 10 Nov" note and "(unverified)" prices are recognised in the text
+the agent's code writes, so a reloaded chat looks the same as a live one.
+
+**Interview lines:** "Why no React?" The page is one screen with a few live parts; a store plus small render modules
+is easy to read, needs no build, and `npm run dev` stays one command. "How do you stop XSS from model output?" Escape
+first, then add only our own tags; links must be http(s); logos are re-served from our origin as sniffed images, and
+our letter tiles (SVG) carry a no-script CSP.
+
 ## 10 likely interview questions
 
 1. **Walk me through what happens when I ask "Last Tuesday I asked about Postgres hosting, has pricing changed?"**
@@ -134,8 +150,8 @@ streaming guard, not a prompt rule. "Who decides what to search?" The agent, in 
 8. **How do you test an agent?** Unit tests for the deterministic parts (time, diff, routing rules) and scripted
    multi-day conversations on a fake clock and a fixture web where prices change on known dates. Same scripts can
    run live with a spend cap.
-9. **What did you choose not to build?** A vector DB, an agent framework, a fancy UI, multi-step autonomous
-   browsing. Each adds latency or opacity without helping the core: right answers, remembered over time.
+9. **What did you choose not to build?** A vector DB, an agent framework, a front-end framework or build step,
+   multi-step autonomous browsing. Each adds latency or opacity without helping the core: right answers, remembered over time.
 10. **How does this fit minimi?** minimi wants an assistant that catches what matters and pings at the right moment.
     Claims are "things to keep an eye on"; the watchlist re-checks them and speaks only when something changed.
 

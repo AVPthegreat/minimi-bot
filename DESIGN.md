@@ -59,6 +59,15 @@ question at once, the then/now table when the re-check ends. Search answers: Opu
 slowest search (Tavily ≈1 s; Anthropic search ≈3-8 s), then tokens as they arrive (a price line waits for its end).
 Live 16 Nov, before this change: 16-37 s to the first word on search turns.
 
+**Web UI** (`public/`, plain ES modules, no framework or build step). `api.js` owns fetch, the SSE parser and typed
+errors; `state.js` is one observable store; `chat.js` turns stream events into view calls (busy, stop, retry);
+`render/*` only draw (messages, search steps, sources, sidebar, home, composer, banner); `markdown.js` escapes every
+character before adding its own tags. The stream carries typed `search` events (query, running/done/failed/cancelled,
+result count, the product's site) next to the old status lines, so older clients still work. Logos come from our own
+`GET /api/logo` (`src/logo.ts`): fetched server-side over https from public addresses only (checked at connect time),
+sniffed as raster images, size/time capped, cached in memory and on disk, a letter tile otherwise. Glass panels fall
+back to solid under `prefers-reduced-transparency` or without `backdrop-filter`; text tokens pass AA on the worst-case aurora.
+
 **Eval.** `eval/scenarios.ts` replays multi-day conversations (the three example questions, nudges, fast paths) on a
 fake clock against a fixture web whose prices change on known dates: 48 checks, offline in `npm test`, plus a test
 per failure of the first live run (`test/livegaps.test.ts`).
