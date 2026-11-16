@@ -1,0 +1,161 @@
+/* Design tokens: colour, glass, depth, motion. Light is the base; dark follows the system unless the
+   user picked a theme (html[data-theme]). Every text colour is checked for WCAG AA against the glass
+   it sits on, composited over the brightest and darkest parts of the aurora (see DESIGN.md). */
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-latin-wght.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* Page and aurora */
+  --bg: #f3efff;
+  --aurora-a: #a78bfa;
+  --aurora-b: #f472b6;
+  --aurora-c: #22d3ee;
+  --aurora-d: #818cf8;
+  --aurora-e: #fbbf24;
+  --aurora-opacity: 0.75;
+
+  /* Glass */
+  --glass: rgba(255, 255, 255, 0.56);
+  --glass-strong: rgba(255, 255, 255, 0.74);
+  --glass-hover: rgba(255, 255, 255, 0.82);
+  --glass-solid: #fbf9ff;
+  --glass-border: rgba(255, 255, 255, 0.85);
+  --glass-edge: rgba(109, 40, 217, 0.14);
+  --glass-shine: rgba(255, 255, 255, 0.9);
+  --blur: blur(22px) saturate(180%);
+
+  /* Text: deep indigo, never grey */
+  --text: #1a1240;
+  --text-2: #362c6b;
+  --text-3: #5b4f99;
+
+  /* Accent */
+  --accent: #6d28d9;
+  --accent-ink: #4c1d95;
+  --accent-soft: rgba(124, 58, 237, 0.12);
+  --accent-grad: linear-gradient(135deg, #7c3aed 0%, #c026d3 55%, #db2777 100%);
+  --on-accent: #ffffff;
+  --ring: #7c3aed;
+
+  /* Status */
+  --ok: #065f46;
+  --ok-soft: rgba(16, 185, 129, 0.16);
+  --warn: #8a2c0d;
+  --warn-soft: rgba(249, 115, 22, 0.16);
+  --bad: #991b1b;
+  --bad-soft: rgba(239, 68, 68, 0.14);
+  --info: #155e75;
+  --info-soft: rgba(6, 182, 212, 0.16);
+
+  /* User bubble */
+  --user-bg: linear-gradient(135deg, #7c3aed, #c026d3);
+  --user-text: #ffffff;
+
+  /* Depth */
+  --shadow-1: 0 1px 2px rgba(76, 29, 149, 0.08), 0 4px 16px -6px rgba(76, 29, 149, 0.18);
+  --shadow-2: 0 2px 6px rgba(76, 29, 149, 0.08), 0 18px 48px -18px rgba(76, 29, 149, 0.4);
+  --shadow-glow: 0 10px 32px -10px rgba(192, 38, 211, 0.55);
+
+  --radius-s: 10px;
+  --radius: 16px;
+  --radius-l: 22px;
+
+  --fast: 150ms;
+  --med: 220ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0b0726;
+    --aurora-a: #7c3aed;
+    --aurora-b: #db2777;
+    --aurora-c: #0891b2;
+    --aurora-d: #4f46e5;
+    --aurora-e: #c2410c;
+    --aurora-opacity: 0.62;
+    --glass: rgba(26, 17, 66, 0.5);
+    --glass-strong: rgba(30, 20, 78, 0.7);
+    --glass-hover: rgba(46, 31, 110, 0.72);
+    --glass-solid: #1a1242;
+    --glass-border: rgba(196, 181, 253, 0.18);
+    --glass-edge: rgba(0, 0, 0, 0.3);
+    --glass-shine: rgba(255, 255, 255, 0.1);
+    --text: #f7f4ff;
+    --text-2: #d6cdfc;
+    --text-3: #b9adf5;
+    --accent: #c4b5fd;
+    --accent-ink: #ddd6fe;
+    --accent-soft: rgba(167, 139, 250, 0.18);
+    --ring: #e9d5ff;
+    --ok: #6ee7b7;
+    --ok-soft: rgba(16, 185, 129, 0.2);
+    --warn: #fdba74;
+    --warn-soft: rgba(249, 115, 22, 0.2);
+    --bad: #fca5a5;
+    --bad-soft: rgba(239, 68, 68, 0.2);
+    --info: #67e8f9;
+    --info-soft: rgba(6, 182, 212, 0.2);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px -8px rgba(0, 0, 0, 0.55);
+    --shadow-2: 0 2px 8px rgba(0, 0, 0, 0.3), 0 24px 60px -20px rgba(0, 0, 0, 0.7);
+    --shadow-glow: 0 10px 36px -8px rgba(192, 38, 211, 0.6);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b0726;
+  --aurora-a: #7c3aed;
+  --aurora-b: #db2777;
+  --aurora-c: #0891b2;
+  --aurora-d: #4f46e5;
+  --aurora-e: #c2410c;
+  --aurora-opacity: 0.62;
+  --glass: rgba(26, 17, 66, 0.5);
+  --glass-strong: rgba(30, 20, 78, 0.7);
+  --glass-hover: rgba(46, 31, 110, 0.72);
+  --glass-solid: #1a1242;
+  --glass-border: rgba(196, 181, 253, 0.18);
+  --glass-edge: rgba(0, 0, 0, 0.3);
+  --glass-shine: rgba(255, 255, 255, 0.1);
+  --text: #f7f4ff;
+  --text-2: #d6cdfc;
+  --text-3: #b9adf5;
+  --accent: #c4b5fd;
+  --accent-ink: #ddd6fe;
+  --accent-soft: rgba(167, 139, 250, 0.18);
+  --ring: #e9d5ff;
+  --ok: #6ee7b7;
+  --ok-soft: rgba(16, 185, 129, 0.2);
+  --warn: #fdba74;
+  --warn-soft: rgba(249, 115, 22, 0.2);
+  --bad: #fca5a5;
+  --bad-soft: rgba(239, 68, 68, 0.2);
+  --info: #67e8f9;
+  --info-soft: rgba(6, 182, 212, 0.2);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px -8px rgba(0, 0, 0, 0.55);
+  --shadow-2: 0 2px 8px rgba(0, 0, 0, 0.3), 0 24px 60px -20px rgba(0, 0, 0, 0.7);
+  --shadow-glow: 0 10px 36px -8px rgba(192, 38, 211, 0.6);
+}
+
+/* No backdrop blur (older browsers) or the user asked for less transparency: solid panels. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root, :root[data-theme] { --glass: var(--glass-solid); --glass-strong: var(--glass-solid); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root, :root[data-theme] { --glass: var(--glass-solid); --glass-strong: var(--glass-solid); --glass-hover: var(--glass-solid); --aurora-opacity: 0.35; }
+}
+@media (prefers-contrast: more) {
+  :root, :root[data-theme] { --glass: var(--glass-solid); --glass-strong: var(--glass-solid); --text-2: var(--text); --text-3: var(--text); }
+}

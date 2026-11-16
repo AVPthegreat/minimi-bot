@@ -1,0 +1,57 @@
+/* Answer text: paragraphs, lists, code, tables, and the code-written notes (date reading, quoted
+   earlier question, then/now comparison). */
+
+.md { overflow-wrap: anywhere; }
+.md > :first-child { margin-top: 0; }
+.md p { margin: 0 0 10px; }
+.md ul, .md ol { margin: 0 0 10px; padding-left: 22px; }
+.md li { margin: 3px 0; }
+.md li::marker { color: var(--accent); }
+.md h3, .md h4, .md h5, .md h6 { margin: 14px 0 6px; font-size: 15.5px; letter-spacing: -0.01em; }
+.md strong { font-weight: 680; }
+.md code { font-family: var(--mono); font-size: 0.88em; padding: 1px 5px; border-radius: 6px; background: var(--accent-soft); }
+.md pre { margin: 0 0 10px; padding: 12px 14px; border-radius: 12px; overflow-x: auto; background: var(--glass-solid); border: 1px solid var(--glass-edge); }
+.md pre code { padding: 0; background: none; }
+.md blockquote { margin: 0 0 10px; padding: 4px 12px; border-left: 3px solid var(--accent); color: var(--text-2); }
+.md hr { border: 0; border-top: 1px solid var(--glass-edge); margin: 14px 0; }
+.md a { font-weight: 550; }
+.md .cite {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin: 0 1px; padding: 0 4px;
+  border-radius: 6px; font-size: 10.5px; font-weight: 700; line-height: 1; vertical-align: 0.15em;
+  color: var(--accent-ink); background: var(--accent-soft); text-decoration: none;
+  transition: background var(--fast), color var(--fast);
+}
+.md .cite:hover { color: var(--on-accent); background: var(--accent-grad); }
+
+/* Tables */
+.table-wrap { margin: 4px 0 12px; overflow-x: auto; border-radius: 14px; border: 1px solid var(--glass-edge); background: var(--glass); }
+.md table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.md th, .md td { padding: 8px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--glass-edge); }
+.md thead th { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); background: var(--accent-soft); white-space: nowrap; }
+.md tbody tr:last-child > * { border-bottom: 0; }
+.md tbody tr:hover { background: var(--accent-soft); }
+
+/* Then / now comparison */
+.compare .th-date { display: block; font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text-3); }
+.compare tbody th { font-weight: 500; }
+.compare .subject { display: block; font-weight: 700; }
+.compare .attr { display: block; font-size: 12.5px; color: var(--text-2); }
+.compare td.then { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.compare td.now { font-weight: 650; font-variant-numeric: tabular-nums; }
+.compare .row-changed { background: linear-gradient(90deg, var(--warn-soft), transparent 70%); }
+.compare .row-changed td.then { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--warn) 60%, transparent); }
+.compare .row-changed th { box-shadow: inset 3px 0 0 #f97316; }
+.compare .muted-cell { color: var(--text-3); font-style: italic; }
+
+/* Code-written notes */
+.note { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 10px; padding: 10px 12px; border-radius: 14px; background: var(--info-soft); border: 1px solid color-mix(in srgb, var(--info) 22%, transparent); }
+.note > .icon { width: 18px; height: 18px; margin-top: 2px; color: var(--info); }
+.note p { margin: 0; }
+.note-title { font-weight: 600; }
+.note-title strong { color: var(--info); }
+.note-text { font-size: 13.5px; color: var(--text-2); }
+.recall { margin: 0 0 12px; padding: 10px 14px 12px; border-radius: 14px; background: var(--accent-soft); border: 1px solid var(--glass-edge); }
+.recall figcaption { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 650; color: var(--accent-ink); }
+.recall figcaption .icon { width: 15px; height: 15px; }
+.recall time { font-weight: 750; }
+.recall blockquote { margin: 6px 0 0; padding: 0 0 0 12px; border-left: 3px solid var(--accent); color: var(--text); font-size: 15px; font-style: italic; }

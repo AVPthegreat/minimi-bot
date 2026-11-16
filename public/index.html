@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>minimi</title>
+  <meta name="description" content="A chat agent that searches the web, remembers what you asked and when, and tells you when a fact changes.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/markdown.css">
+  <!-- The saved theme is applied before first paint (no flash); theme.js owns it after that. -->
+  <script>try { const t = localStorage.getItem("minimi:theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
+</head>
+<body>
+  <div class="aurora" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+
+  <div class="app">
+    <aside id="sidebar" class="sidebar glass" aria-label="Conversations">
+      <div class="brand">
+        <span class="orb" aria-hidden="true"></span>
+        <span class="wordmark">minimi</span>
+        <button id="close-sidebar" class="icon-btn only-phone" type="button" aria-label="Close conversations"></button>
+      </div>
+      <button id="new-chat" class="btn btn-primary btn-block" type="button">
+        <span data-icon="plus"></span><span>New chat</span><kbd id="new-chat-kbd" class="kbd kbd-on-accent">Ctrl K</kbd>
+      </button>
+      <nav id="sessions" class="sessions" aria-label="Past conversations"></nav>
+      <div class="sidebar-foot">
+        <details id="clock" class="clock" hidden>
+          <summary><span data-icon="clock"></span><span>Demo clock</span></summary>
+          <form id="clock-form" class="clock-form">
+            <label for="clock-input">Move "now" to test memory across days</label>
+            <input id="clock-input" type="datetime-local" required>
+            <div class="row">
+              <button class="btn btn-small" type="submit">Set time</button>
+              <button id="clock-reset" class="btn btn-small btn-ghost" type="button">Real time</button>
+            </div>
+          </form>
+        </details>
+        <div id="env" class="env-chip" role="status"></div>
+      </div>
+    </aside>
+    <button id="scrim" class="scrim" type="button" aria-label="Close conversations" tabindex="-1" hidden></button>
+
+    <main id="main" class="main">
+      <header class="topbar">
+        <button id="open-sidebar" class="icon-btn glass only-phone" type="button" aria-label="Show conversations" aria-controls="sidebar" aria-expanded="false"></button>
+        <div id="now" class="now-chip glass" title="The time minimi uses for words like yesterday or last Tuesday"></div>
+        <div class="topbar-actions">
+          <button id="new-chat-top" class="icon-btn glass only-phone" type="button" aria-label="New chat"></button>
+          <button id="theme" class="icon-btn glass" type="button" aria-label="Switch theme"></button>
+        </div>
+      </header>
+      <div id="banner" class="banner-slot" aria-live="assertive"></div>
+      <section id="log" class="log" aria-label="Conversation" aria-busy="false"></section>
+      <div class="composer-wrap">
+        <form id="composer" class="composer glass" autocomplete="off">
+          <label for="input" class="visually-hidden">Message minimi</label>
+          <textarea id="input" rows="1" maxlength="4000" placeholder="Ask about prices, plans, releases, or what you asked last week" enterkeyhint="send"></textarea>
+          <button id="send" class="send-btn" type="submit" aria-label="Send message"></button>
+        </form>
+        <p class="composer-hint"><span><kbd class="kbd">Enter</kbd> send</span><span><kbd class="kbd">Shift Enter</kbd> new line</span><span id="count" aria-live="polite"></span></p>
+      </div>
+    </main>
+  </div>
+  <script src="/js/main.js" type="module"></script>
+</body>
+</html>
