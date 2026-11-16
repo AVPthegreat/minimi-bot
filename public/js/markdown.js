@@ -34,9 +34,9 @@ const STATUS = {
 export function inline(raw, sources = []) {
   const slots = [];
   const keep = (html) => `\u0000${slots.push(html) - 1}\u0000`;
-  let s = esc(raw);
+  let s = esc(raw).replace(/\u0000/g, ""); // NUL is the slot marker below; input must not forge one
   s = s.replace(/`([^`]+)`/g, (_, code) => keep(`<code>${code}</code>`));
-  s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, text, href) => {
+  s = s.replace(/\[([^[\]]+)\]\(([^)\s]{1,2048})\)/g, (m, text, href) => {
     const url = safeUrl(href);
     return url ? keep(`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`) : m;
   });
@@ -52,7 +52,7 @@ export function inline(raw, sources = []) {
 }
 
 const LIST = /^\s*([-*]|\d+\.)\s+/;
-const DATE_NOTE = /^\*\*(.+?) = (.+?)\.\*\*\s*(.*)$/;
+const DATE_NOTE = /^\*\*(.{1,200}?) = (.{1,200}?)\.\*\*\s*(.*)$/; // bounded: unbounded lazy groups went quadratic
 const QUOTE = /^You asked on (.+?): "(.*)"\s*$/;
 
 function splitRow(line) {
