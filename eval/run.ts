@@ -7,10 +7,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { loadConfig } from "../src/config.ts";
 import { buildModels } from "../src/index.ts";
-import { FakeLLM } from "../src/llm/fake.ts";
-import { FakeSearch } from "../src/search/fake.ts";
 import { UsageMeter } from "../src/usage.ts";
-import { SCENARIOS, type StepReport, runScenario } from "./scenarios.ts";
+import { SCENARIOS, type StepReport, offlineModels, runScenario } from "./scenarios.ts";
 
 const live = process.env.EVAL_LIVE === "1";
 const cfg = loadConfig();
@@ -34,12 +32,15 @@ for (const sc of SCENARIOS.filter((s) => !only || s.name === only)) {
   const reports = await runScenario(
     sc,
     (clock) =>
-      live ? buildModels(cfg, clock, meter) : { llm: new FakeLLM(), search: new FakeSearch(clock) },
+      live ? buildModels(cfg, clock, meter) : offlineModels(clock),
     { live },
   );
   all.push(...reports);
   for (const r of reports) {
-    const t = r.result.firstTokenMs === null ? "" : ` | first token ${r.result.firstTokenMs} ms, total ${r.result.totalMs} ms`;
+    const ms = (x: number | null | undefined) => (x === null || x === undefined ? "-" : `${x} ms`);
+    const t = r.result.firstTokenMs === null
+      ? ""
+      : ` | first status ${ms(r.result.firstStatusMs)}, first text ${ms(r.result.firstTokenMs)}, first model token ${ms(r.result.firstModelTokenMs)}, total ${r.result.totalMs} ms`;
     console.log(`  ${r.step}. "${r.say}" -> ${r.result.intent ?? "nudge"} | ${r.result.searches} searches${t}`);
     for (const c of r.checks) {
       if (c.skipped) console.log(`     -  ${c.name} (skipped live)`);
@@ -71,9 +72,14 @@ function writeResults(reports: StepReport[]): string {
   const latency = [...byIntent.entries()].map(([intent, rs]) => {
     const first = rs.flatMap((r) => (r.result.firstTokenMs === null ? [] : [r.result.firstTokenMs]));
     const total = rs.map((r) => r.result.totalMs);
+    const status = rs.flatMap((r) => (r.result.firstStatusMs == null ? [] : [r.result.firstStatusMs]));
+    const model = rs.flatMap((r) => (r.result.firstModelTokenMs == null ? [] : [r.result.firstModelTokenMs]));
     return {
       intent,
       turns: rs.length,
+      firstStatusP50: pct(status, 50),
+      firstModelTokenP50: pct(model, 50),
+      firstModelTokenP95: pct(model, 95),
       firstTokenP50: pct(first, 50),
       firstTokenP95: pct(first, 95),
       totalP50: pct(total, 50),
@@ -94,7 +100,9 @@ function writeResults(reports: StepReport[]): string {
       step: r.step,
       say: r.say,
       intent: r.result.intent ?? "nudge",
+      firstStatusMs: r.result.firstStatusMs ?? null,
       firstTokenMs: r.result.firstTokenMs,
+      firstModelTokenMs: r.result.firstModelTokenMs ?? null,
       totalMs: r.result.totalMs,
       searches: r.result.searches,
       failedChecks: r.checks.filter((c) => !c.pass).map((c) => c.name),
@@ -111,9 +119,9 @@ function writeResults(reports: StepReport[]): string {
     "",
     `Checks: ${passed} passed, ${failed} failed. Spend: $${result.spendUsd.toFixed(2)} (${result.spend}).`,
     "",
-    "| Question type | Turns | First token p50 | p95 | Total p50 | p95 | Searches/turn |",
-    "|---|---|---|---|---|---|---|",
-    ...latency.map((l) => `| ${l.intent} | ${l.turns} | ${ms(l.firstTokenP50)} | ${ms(l.firstTokenP95)} | ${ms(l.totalP50)} | ${ms(l.totalP95)} | ${l.searchesAvg} |`),
+    "| Question type | Turns | First status p50 | First text p50 | p95 | First model token p50 | p95 | Total p50 | p95 | Searches/turn |",
+    "|---|---|---|---|---|---|---|---|---|---|",
+    ...latency.map((l) => `| ${l.intent} | ${l.turns} | ${ms(l.firstStatusP50)} | ${ms(l.firstTokenP50)} | ${ms(l.firstTokenP95)} | ${ms(l.firstModelTokenP50)} | ${ms(l.firstModelTokenP95)} | ${ms(l.totalP50)} | ${ms(l.totalP95)} | ${l.searchesAvg} |`),
     "",
   ].join("\n");
   writeFileSync(`${base}.md`, md);

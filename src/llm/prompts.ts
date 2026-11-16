@@ -12,12 +12,13 @@ How to answer:
 - Lead with the answer in the first sentence. Then short paragraphs or bullets. Use a markdown table when comparing 3 or more things. No filler and no disclaimers about being an AI.
 - The user's current local date and time are in <now>. Use them for words like "today" and to say how old a source is.
 - Facts about the world come from <sources>. Cite each such fact right after it as [n], using the source numbers given. Prefer official pages (pricing pages, changelogs, release notes, docs) and the newest dates. For anything that changes (prices, plans, versions, limits) say the date of the source you rely on.
-- Never state a price, number, version or date that is not in <sources> or <memory>. If the sources do not show it, say so plainly and say where the user can check. Every price you write is checked against the sources after you answer.
-- You may have a web_search tool with a small budget. The <sources> were already fetched for this question, so search only when they do not answer it, look out of date, or a key number has a single weak source. Facts you find that way are cited automatically; do not number them yourself.
+- Write only from <sources> (and <memory> for what was said before). Never state a price, number, version or date that is not in them; if the sources do not show it, say so plainly and say where the user can check. Every price must carry its [n] in the same sentence or table row. If you compute a total, show the arithmetic on the same line with the sourced unit price (for example "20 seats x $14 [2] = $280"). Code checks every price against the sources while you write and marks any unsupported one "(unverified)" before the user sees it.
+- You may have a web_search tool. You only get it when the planned searches found nothing; then search once or twice. Facts you find that way are cited automatically; do not number them yourself.
 - If sources disagree, say so and give both with their dates. If <high_stakes> is true and only one source supports a key number, say that it is single-sourced.
-- <memory> is the record of earlier conversations. When the user asks about the past, quote their earlier question exactly, give its date, and give the gist of your earlier answer. Memory says what was true then, not what is true now.
+- <memory> is the record of earlier conversations. Memory says what was true then, not what is true now. When the user asks about the past, give the gist of your earlier answer.
+- <shown> is what the user already sees right above your reply, written by code: how a date was read, their earlier question quoted with its date, and the re-check table. Do not repeat it and never contradict it; build on it.
 - When <comparison> is present, the user has already seen that table right above your reply. Do not repeat it. In 2-4 sentences say what changed (old to new, with the source date), what did not, and what could not be verified; then mention anything big from <sources> that happened since (launches, pricing changes), with citations.
-- When <notes> is present, state each note briefly (for example how you read an ambiguous date).
+- When <notes> is present, follow them.
 - If the question is ambiguous in a way that changes the answer, answer the most likely reading and say in one line which reading you chose.
 - For small talk, reply briefly and warmly; no sources needed.`;
 
@@ -53,7 +54,7 @@ Rules:
 - Only facts actually stated in the ANSWER. Copy values exactly as written (e.g. "$25").
 - subject: the product or company ("Supabase"). attribute: specific ("Pro plan price", "free tier storage"). unit: e.g. "per month", "per seat per month", or "" if none.
 - source_n: the citation number [n] the answer gives for the fact, or 0 if none.
-- At most 12 facts, most important first.`;
+- Cover every product the answer prices, at most 3 facts per product and 15 in total, most important first. Use the product name alone as subject ("HubSpot", not "HubSpot Sales Hub"); put the edition or plan in attribute.`;
 
 export const EXTRACT_SCHEMA = {
   type: "object",
@@ -139,6 +140,7 @@ export function renderAnswerTurn(input: AnswerInput): string {
     );
   }
   if (input.diff) parts.push(`<comparison then="${input.diff.thenLabel}">\n${input.diff.table}\n</comparison>`);
+  if (input.shown.length) parts.push(`<shown>\n${input.shown.join("\n")}\n</shown>`);
   if (input.notes.length) parts.push(`<notes>\n${input.notes.map((n) => `- ${n}`).join("\n")}\n</notes>`);
   if (input.intent !== "chat") parts.push(renderSources(input.sources));
   parts.push(`<question>${input.question}</question>`);

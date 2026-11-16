@@ -1,11 +1,14 @@
 // The agent core. One turn:
-//   save the message (with its time) -> resolve time phrases -> route -> gather evidence
-//   (nothing | memory | parallel web searches | claim re-checks) -> stream the answer
-//   -> check prices against evidence -> save -> extract claims in the background.
+//   save the message (with its time) -> resolve time phrases -> plan searches in code and start them
+//   while routing -> gather evidence (nothing | memory | one search per subject | claim re-checks), with
+//   progress lines as each search finishes -> show code-rendered lines (date reading, quote, table) ->
+//   stream the answer through the grounding guard -> save -> extract claims in the background.
 // Everything the UI, the CLI and the eval use goes through this class.
 
 import { randomUUID } from "node:crypto";
-import { renderDiffTable, summarizeDiff, unsupportedPrices } from "./claims.ts";
+import { type EvidenceDoc, priceChecker, questionMultipliers, renderDiffTable, sameValue, summarizeDiff } from "./claims.ts";
+import { GroundingGuard } from "./grounding.ts";
+import { canonicalSubject, fairCap, planSubjects, subjectQueries } from "./planner.ts";
 import type { ClaimRow, SessionRow, Store } from "./db.ts";
 import type { AnswerInput, Intent, LLM, PastTurn, RoutePlan } from "./llm/types.ts";
 import { recall, toPastTurn } from "./memory.ts";
@@ -50,7 +53,12 @@ export interface PublicSource {
 export interface Timings {
   routeMs: number;
   evidenceMs: number;
+  /** First progress line ("Searching the web for ..."). */
+  firstStatusMs: number | null;
+  /** First answer text of any kind, including code-rendered lines (date reading, quote, table). */
   firstTokenMs: number | null;
+  /** First token written by the answer model. */
+  firstModelTokenMs: number | null;
   totalMs: number;
 }
 
@@ -58,6 +66,9 @@ const HISTORY_TURNS = 8;
 /** While a speculative search is already running, wait at most this long for the router model. */
 const SPECULATIVE_ROUTER_TIMEOUT_MS = 1500;
 const MAX_INPUT = 4000;
+/** Facts kept per answer: every product of a 5-item shortlist, up to 3 facts each. */
+const MAX_STORED_CLAIMS = 15;
+const MAX_CLAIMS_PER_SUBJECT = 3;
 
 export class Agent {
   private readonly pending = new Set<Promise<unknown>>();
@@ -124,26 +135,66 @@ export class Agent {
     // A conversation must start with a user turn.
     while (history.length && history[0]!.role !== "user") history.shift();
 
-    // Speculative prefetch: when the rules can't decide, the message is most likely a web question, so
-    // search for it right away while the router model decides. If the router says no search is needed,
-    // the speculative search is cancelled; if the router is slow, its fallback reuses these results.
+    // Progress from work running in parallel (each search as it finishes) reaches the user at once.
+    const updates = new Updates();
+    let firstStatusMs: number | null = null;
+    const status = (t: string): AgentEvent => {
+      if (firstStatusMs === null) firstStatusMs = performance.now() - t0;
+      return { type: "status", text: t };
+    };
+    const onRun = (run: QueryRun, done: number, total: number) =>
+      updates.push(status(`${run.error ? "Search failed" : `${run.results.length} result${run.results.length === 1 ? "" : "s"}`} for "${run.query}" (${done} of ${total} searches done)`));
+
+    // The agent owns the search plan. When the rules can't decide, the message is most likely a web
+    // question, so the searches start right away while the router model decides: the raw question
+    // (speculative) plus, for a comparison, one search per subject named in the message (read by code).
+    // If the router says no search is needed, they are cancelled.
     const routeInput = { text, rest: parsed.rest, nowLabel, history, timePhrases: parsed.refs.map((r) => r.phrase) };
     const undecided = rulesRoute(text, parsed.refs.length > 0, history.length > 0, parsed.rest) === null;
     const specQuery = text.slice(0, 300);
+    const subjects = undecided ? planSubjects(parsed.rest) : [];
+    const planned = undecided
+      ? [
+          { query: specQuery, purpose: "speculative", opts: { maxResults: 5 } },
+          ...subjectQueries(subjects, parsed.rest).map((q) => ({ query: q, purpose: "answer", opts: { maxResults: 5 } })),
+        ]
+      : [];
     const specAbort = new AbortController();
-    const spec = undecided
-      ? runQueries(this.deps.search, [{ query: specQuery, purpose: "speculative", opts: { maxResults: 5 } }], signal ? AbortSignal.any([specAbort.signal, signal]) : specAbort.signal)
+    const spec = planned.length
+      ? runQueries(this.deps.search, planned, signal ? AbortSignal.any([specAbort.signal, signal]) : specAbort.signal, (...a) => {
+          if (!specAbort.signal.aborted) onRun(...a);
+        })
       : null;
+    if (spec) {
+      yield status(subjects.length
+        ? `Searching the web for ${subjects.join(", ")} (${planned.length} searches in parallel)`
+        : `Searching the web: ${specQuery.slice(0, 120)}`);
+    }
     const plan = await route(llm, routeInput, { timeoutMs: spec ? SPECULATIVE_ROUTER_TIMEOUT_MS : 4000 });
     if (spec && plan.intent !== "search") specAbort.abort();
     const routeMs = performance.now() - t0;
     store.updateMessageMeta(userId, { intent: plan.intent });
-    yield { type: "route", intent: plan.intent, via: plan.via, queries: plan.searchQueries };
+    // Code found the subjects: that plan is already running. Otherwise the router's queries are added.
+    const extra = plan.intent === "search" && !subjects.length ? plan.searchQueries.filter((q) => !(spec && sameQuery(q, specQuery))) : [];
+    const queries = plan.intent === "search" ? [...planned.map((p) => p.query), ...extra] : plan.searchQueries;
+    yield { type: "route", intent: plan.intent, via: plan.via, queries };
 
     let sources: Source[] = [];
     let memory: PastTurn[] = [];
     const notes: string[] = [];
-    let prefix = "";
+    const shown: string[] = [];
+    let answer = "";
+    let firstTokenMs: number | null = null;
+    let firstModelTokenMs: number | null = null;
+    // Code-rendered text (how a date was read, the quoted earlier question, the re-check table).
+    const show = (lines: string[]): AgentEvent | null => {
+      if (!lines.length) return null;
+      shown.push(...lines);
+      const t = `${lines.join("\n\n")}\n\n`;
+      answer += t;
+      if (firstTokenMs === null) firstTokenMs = performance.now() - t0;
+      return { type: "delta", text: t };
+    };
     let diff: AnswerInput["diff"];
     const runs: QueryRun[] = [];
     let recheckToSave: Parameters<typeof saveRecheck>[1] | null = null;
@@ -153,8 +204,9 @@ export class Agent {
       if (plan.intent === "recall" || plan.intent === "verify") {
         const r = recall(store, { refs: parsed.refs, query: plan.memoryQuery || parsed.rest, currentMessageId: userId, sessionId, tz, nowMs: now });
         memory = r.turns;
-        notes.push(...r.notes);
-        if (memory.length) yield { type: "status", text: `Found ${memory.length === 1 ? "your question" : `${memory.length} questions`} from ${memory[0]!.when.split(",")[0]}` };
+        const quotes = memory.map((t) => `You asked on ${t.when}: "${t.question.replace(/\s+/g, " ")}"`);
+        const ev = show([...r.notes, ...quotes]);
+        if (ev) yield ev;
       }
 
       if (plan.intent === "verify" || plan.intent === "updates") {
@@ -167,46 +219,48 @@ export class Agent {
           const thenMs = Math.min(...claims.map((c) => c.checked_at));
           const thenLabel = formatCivil(civilDateOf(thenMs, tz), civilDateOf(now, tz));
           const sinceDays = Math.max(1, daysBetween(civilDateOf(thenMs, tz), civilDateOf(now, tz)));
-          yield { type: "status", text: `Re-checking ${claims.length} fact${claims.length > 1 ? "s" : ""} from ${thenLabel}` };
-          const outcome = await recheckClaims(this.deps, claims, { nowMs: now, maxQueries: 5, newsSinceDays: sinceDays, signal });
+          const nSubjects = new Set(claims.map((c) => c.subject.toLowerCase())).size;
+          yield status(`Re-checking ${claims.length} fact${claims.length > 1 ? "s" : ""} about ${nSubjects} subject${nSubjects > 1 ? "s" : ""} from ${thenLabel}`);
+          const maxQueries = plan.intent === "updates" ? this.watch.maxSearches : 5;
+          const outcome = yield* drain(recheckClaims(this.deps, claims, { nowMs: now, maxQueries, newsSinceDays: sinceDays, signal, onRun }), updates);
           runs.push(...outcome.runs);
           sources = outcome.sources;
           const table = renderDiffTable(outcome.rows, thenLabel, formatCivil(civilDateOf(now, tz), civilDateOf(now, tz)));
           diff = { rows: outcome.rows, table, thenLabel };
           recheckToSave = outcome;
-          prefix = `${summarizeDiff(outcome.rows, thenLabel)}\n\n${table}\n\n`;
+          const ev = show([summarizeDiff(outcome.rows, thenLabel), table]);
+          if (ev) yield ev;
         } else if (plan.intent === "verify" && memory.length) {
           // The earlier answer had no stored facts: search the earlier question again and let the
           // model compare old answer and fresh sources.
           const q = memory[0]!.question.slice(0, 300);
-          yield { type: "status", text: `Searching again: ${q}` };
-          runs.push(...(await runQueries(this.deps.search, [{ query: q, purpose: "verify-freeform" }], signal)));
+          yield status(`Searching again: ${q}`);
+          runs.push(...(yield* drain(runQueries(this.deps.search, [{ query: q, purpose: "verify-freeform" }], signal, onRun), updates)));
           sources = rankSources(runs, [], now);
         } else if (plan.intent === "updates") {
-          notes.push("I'm not tracking any facts yet. Ask me about prices, plans or releases and I'll keep an eye on them.");
+          const ev = show(["I'm not tracking any facts yet. Ask me about prices, plans or releases and I'll keep an eye on them."]);
+          if (ev) yield ev;
         }
       }
 
       if (plan.intent === "search") {
-        yield { type: "status", text: `Searching: ${plan.searchQueries.join(" | ")}` };
-        // The speculative search already covers the raw question; run only the router's other queries.
-        const extra = plan.searchQueries.filter((q) => !(spec && sameQuery(q, specQuery)));
-        const [specRuns, planRuns] = await Promise.all([
-          spec ?? Promise.resolve([]),
-          extra.length
-            ? runQueries(
-                this.deps.search,
-                extra.map((q) => ({
-                  query: q,
-                  purpose: "answer",
-                  opts: { maxResults: plan.highStakes ? 6 : 5, ...(plan.sinceDays ? { sinceDays: plan.sinceDays } : {}) },
-                })),
-                signal,
-              )
-            : Promise.resolve([]),
-        ]);
+        if (extra.length) yield status(`Searching the web: ${extra.join(" | ")}`);
+        const extraRuns = extra.length
+          ? runQueries(
+              this.deps.search,
+              extra.map((q) => ({
+                query: q,
+                purpose: "answer",
+                opts: { maxResults: plan.highStakes ? 6 : 5, ...(plan.sinceDays ? { sinceDays: plan.sinceDays } : {}) },
+              })),
+              signal,
+              onRun,
+            )
+          : Promise.resolve([]);
+        const [specRuns, planRuns] = yield* drain(Promise.all([spec ?? Promise.resolve([]), extraRuns]), updates);
         runs.push(...specRuns, ...planRuns);
-        sources = rankSources(runs, plan.searchQueries, now, 8);
+        // Every subject keeps at least its best page, so no product of a comparison goes unsourced.
+        sources = rankSources(runs, subjects.length ? subjects : plan.searchQueries, now, Math.max(8, subjects.length * 2 + 2), { coverEachQuery: subjects.length > 0 });
       }
     } catch (e) {
       if (signal?.aborted) return;
@@ -222,16 +276,8 @@ export class Agent {
     const evidenceMs = performance.now() - t0 - routeMs;
     if (sources.length) yield { type: "sources", sources: sources.map(publicSource) };
 
-    // ---- Answer: code-rendered prefix (the diff table) first, then the model's words.
-    let answer = "";
-    let firstTokenMs: number | null = null;
-    if (prefix) {
-      answer += prefix;
-      firstTokenMs = performance.now() - t0;
-      yield { type: "delta", text: prefix };
-    }
-    // The answer model may search on its own (bounded) when the prefetched sources fall short; pages it
-    // finds join the numbered source list, and its citations become [n] markers.
+    // ---- Answer. The model writes from the gathered sources only; it gets its own web_search (the
+    // fallback loop) only when the planned searches found nothing at all.
     const selfSearches: string[] = [];
     const addSource = (r: SearchResult): { source: Source; added: boolean } => {
       const existing = sources.find((x) => x.url === r.url);
@@ -240,7 +286,28 @@ export class Agent {
       sources.push(source);
       return { source, added: true };
     };
-    const maxSelfSearches = intent === "search" || intent === "verify" || intent === "updates" ? (this.deps.maxSelfSearches ?? 3) : 0;
+    const webIntent = intent === "search" || intent === "verify" || intent === "updates";
+    const maxSelfSearches = webIntent && sources.length === 0 ? (this.deps.maxSelfSearches ?? 3) : 0;
+
+    // ---- Grounding, enforced while streaming: every price the model writes must be backed by CURRENT
+    // evidence (the gathered sources, passages it cited, the computed diff table), or it is marked
+    // "(unverified)" before the user sees it. Old answers are not evidence for today's prices; only a
+    // pure recall answer may quote them, as history.
+    const evidence = (): EvidenceDoc[] => [
+      ...sources.map((x) => ({ text: `${x.title}\n${x.snippet}`, about: x.query === specQuery ? x.title : `${x.title} ${x.query}` })),
+      { text: diff?.table ?? "" },
+      ...(intent === "recall" ? memory.map((t) => ({ text: t.answer })) : []),
+    ];
+    const multipliers = questionMultipliers(text);
+    const guard = new GroundingGuard((line) => priceChecker(evidence(), { multipliers })(line));
+    const out = (t: string): AgentEvent | null => {
+      const safe = guard.push(t);
+      if (!safe) return null;
+      if (firstTokenMs === null) firstTokenMs = performance.now() - t0;
+      if (firstModelTokenMs === null) firstModelTokenMs = performance.now() - t0;
+      answer += safe;
+      return { type: "delta", text: safe };
+    };
     try {
       if (signal?.aborted) throw new Error("stopped");
       for await (const ev of llm.streamAnswer({
@@ -252,17 +319,17 @@ export class Agent {
         memory,
         diff,
         notes,
+        shown,
         highStakes: plan.highStakes,
         maxSelfSearches,
         signal,
       })) {
         if (ev.type === "text") {
-          if (firstTokenMs === null) firstTokenMs = performance.now() - t0;
-          answer += ev.text;
-          yield { type: "delta", text: ev.text };
+          const d = out(ev.text);
+          if (d) yield d;
         } else if (ev.type === "searching") {
           selfSearches.push(ev.query);
-          yield { type: "status", text: `Searching the web: ${ev.query}` };
+          yield status(`Searching the web: ${ev.query}`);
         } else if (ev.type === "source") {
           if (addSource(ev.result).added) yield { type: "sources", sources: sources.map(publicSource) };
         } else if (ev.type === "cite") {
@@ -271,33 +338,29 @@ export class Agent {
           if (added) yield { type: "sources", sources: sources.map(publicSource) };
           const tag = ` [${source.n}]`;
           if (!answer.endsWith(tag)) {
-            answer += tag;
-            yield { type: "delta", text: tag };
+            const d = out(tag);
+            if (d) yield d;
           }
         }
       }
     } catch (e) {
       if (!signal?.aborted) {
-        const msg = `\n\n(The model failed before finishing: ${(e as Error).message})`;
-        answer += msg;
+        const d = out(`\n\n(The model failed before finishing: ${(e as Error).message})`);
+        if (d) yield d;
         yield { type: "error", message: (e as Error).message };
       }
+    }
+    const tail = guard.end();
+    if (tail) {
+      answer += tail;
+      yield { type: "delta", text: tail };
     }
     for (const q of selfSearches) {
       store.logSearch(userId, q, "answer-model web_search", "self-search", sources.filter((x) => x.query === "(answer model)"), now);
     }
 
-    // ---- Correctness guard: every price in the answer must be backed by CURRENT evidence (fresh sources,
-    // including passages the model cited from its own searches, and the computed diff table). Old answers
-    // are not evidence for today's prices; only a pure recall answer may quote them, as history.
-    const evidence = [
-      ...sources.map((x) => `${x.title}\n${x.snippet}`),
-      diff?.table ?? "",
-      ...(intent === "recall" ? memory.map((t) => t.answer) : []),
-    ].join("\n");
-    const warnings = unsupportedPrices(answer, evidence).map(
-      (p) => `I couldn't match ${p} to a current source. Treat it as unverified.`,
-    );
+    const flagged = [...new Set(guard.flagged)];
+    const warnings = flagged.map((p) => `I couldn't match ${p} to a current source. Treat it as unverified.`);
     for (const w of warnings) yield { type: "warning", text: w };
 
     const stopped = signal?.aborted ?? false;
@@ -305,7 +368,9 @@ export class Agent {
     const timings: Timings = {
       routeMs: Math.round(routeMs),
       evidenceMs: Math.round(evidenceMs),
+      firstStatusMs: firstStatusMs === null ? null : Math.round(firstStatusMs),
       firstTokenMs: firstTokenMs === null ? null : Math.round(firstTokenMs),
+      firstModelTokenMs: firstModelTokenMs === null ? null : Math.round(firstModelTokenMs),
       totalMs: Math.round(performance.now() - t0),
     };
     const assistantId = store.addMessage(sessionId, "assistant", answer || (stopped ? "(stopped)" : "(no answer)"), doneAt, {
@@ -314,7 +379,7 @@ export class Agent {
       replyTo: userId,
       sources: sources.map(publicSource),
       warnings,
-      notes,
+      notes: [...shown.filter((l) => !l.startsWith("|")), ...notes],
       timings,
       aborted: stopped,
     });
@@ -322,11 +387,18 @@ export class Agent {
     // A stopped turn keeps its partial text but teaches memory nothing (no re-check versions, no claims).
     if (recheckToSave && !stopped) saveRecheck(store, recheckToSave, assistantId, sessionId, doneAt);
 
-    // ---- Remember the checkable facts of new answers, off the critical path.
+    // ---- Remember the checkable facts of new answers, off the critical path: under the subjects the
+    // agent searched for, every product of a shortlist covered, and never a price marked unverified.
     if (!stopped && (intent === "search" || (intent === "verify" && !recheckToSave)) && sources.length && answer) {
       this.background(
         llm.extractClaims({ question: text, answer, sources }).then((claims) => {
-          const known = claims.filter((c) => c.subject && c.attribute && c.value);
+          const known = fairCap(
+            claims
+              .filter((c) => c.subject && c.attribute && c.value && !flagged.some((f) => sameValue(f, c.value)))
+              .map((c) => canonicalSubject(c, subjects)),
+            MAX_STORED_CLAIMS,
+            MAX_CLAIMS_PER_SUBJECT,
+          );
           if (known.length) store.addClaims(assistantId, sessionId, known, doneAt);
         }),
       );
@@ -363,4 +435,36 @@ function turnsForClaims(store: Store, claims: ClaimRow[], tz: string, nowMs: num
     if (turns.length >= 3) break;
   }
   return turns;
+}
+
+/** Events produced by parallel work (searches finishing), queued until the turn's generator yields them. */
+class Updates {
+  private items: AgentEvent[] = [];
+  private wake: (() => void) | null = null;
+  push(e: AgentEvent): void {
+    this.items.push(e);
+    this.wake?.();
+  }
+  take(): AgentEvent[] {
+    return this.items.splice(0);
+  }
+  next(): Promise<void> {
+    return new Promise((r) => (this.wake = r));
+  }
+}
+
+/** Await `p`, yielding progress events as they arrive; returns p's value (use with `yield*`). */
+async function* drain<T>(p: Promise<T>, updates: Updates): AsyncGenerator<AgentEvent, T> {
+  let settled = false;
+  const done = p.finally(() => {
+    settled = true;
+  });
+  done.catch(() => {});
+  while (!settled) {
+    for (const e of updates.take()) yield e;
+    if (settled) break;
+    await Promise.race([done.then(() => undefined, () => undefined), updates.next()]);
+  }
+  for (const e of updates.take()) yield e;
+  return await p;
 }

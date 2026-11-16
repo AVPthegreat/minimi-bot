@@ -6,12 +6,12 @@ import { FakeLLM } from "../src/llm/fake.ts";
 import { FakeSearch } from "../src/search/fake.ts";
 import type { SearchProvider } from "../src/search/types.ts";
 import { FakeClock } from "../src/time.ts";
-import { SCENARIOS, runScenario } from "../eval/scenarios.ts";
+import { SCENARIOS, offlineModels, runScenario } from "../eval/scenarios.ts";
 
 // The whole offline eval is part of `npm test`.
 for (const sc of SCENARIOS) {
   test(`eval scenario: ${sc.name}`, async () => {
-    const reports = await runScenario(sc, (clock) => ({ llm: new FakeLLM(), search: new FakeSearch(clock) }));
+    const reports = await runScenario(sc, offlineModels);
     const failures = reports.flatMap((r) => r.checks.filter((c) => !c.pass).map((c) => `step ${r.step} ("${r.say}"): ${c.name}\n${r.result.text}`));
     assert.deepEqual(failures, []);
   });

@@ -66,9 +66,9 @@ export class AnthropicLLM implements LLM {
   }
 
   /**
-   * Streams the answer. When `maxSelfSearches` > 0 the model also gets Anthropic's server-side
-   * web_search tool, capped at that many uses: the bounded agent loop for when the prefetched sources
-   * do not answer the question. The searches run inside this one streamed request (no extra round
+   * Streams the answer. When `maxSelfSearches` > 0 (only when the agent's planned searches found
+   * nothing) the model also gets Anthropic's server-side web_search tool, capped at that many uses.
+   * Otherwise it has no tool and writes only from the gathered sources, so text starts at once. The searches run inside this one streamed request (no extra round
    * trips from us); we surface what it searched, the pages it found and the passages it cited.
    */
   async *streamAnswer(input: AnswerInput): AsyncIterable<AnswerEvent> {
@@ -134,7 +134,7 @@ export class AnthropicLLM implements LLM {
       `<question>${input.question}</question>\n\n<answer>\n${input.answer}\n</answer>`,
       EXTRACT_SCHEMA, 20000, 4096,
     );
-    return r.claims.slice(0, 12).map((c) => {
+    return r.claims.slice(0, 24).map((c) => {
       const src = input.sources.find((s) => s.n === c.source_n);
       return {
         subject: c.subject, attribute: c.attribute, value: c.value, unit: c.unit || null,

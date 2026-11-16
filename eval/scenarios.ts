@@ -5,7 +5,9 @@
 
 import { Agent, type AgentEvent } from "../src/agent.ts";
 import { Store } from "../src/db.ts";
+import { FakeLLM } from "../src/llm/fake.ts";
 import type { LLM } from "../src/llm/types.ts";
+import { FakeSearch } from "../src/search/fake.ts";
 import type { SearchProvider } from "../src/search/types.ts";
 import { FakeClock } from "../src/time.ts";
 
@@ -16,7 +18,9 @@ export interface TurnResult {
   sources: Array<{ n: number; url: string; date?: string }>;
   warnings: string[];
   searches: number;
+  firstStatusMs?: number | null;
   firstTokenMs: number | null;
+  firstModelTokenMs?: number | null;
   totalMs: number;
   nudge?: string | null;
 }
@@ -186,11 +190,31 @@ export const SCENARIOS: Scenario[] = [
         at: "2026-11-20T10:00:00+05:30",
         session: "b",
         say: "Anything new?",
-        checks: [intent("updates"), tableRow("Neon: Launch plan", "Changed"), { name: "bounded: at most 3 subjects re-checked", ok: (r) => r.text.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| What")).length <= 6 }],
+        checks: [
+          intent("updates"),
+          tableRow("Neon: Launch plan", "Changed"),
+          {
+            name: "bounded: at most 3 subjects re-checked",
+            ok: (r) => {
+              const rows = r.text.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| What"));
+              const subjects = new Set(rows.map((l) => l.slice(2).split(":")[0]!.trim().toLowerCase()));
+              return subjects.size <= 3 && rows.length <= 6 && r.searches <= 6;
+            },
+          },
+        ],
       },
     ],
   },
 ];
+
+/**
+ * The offline models, set up to behave like the live ones where that hid bugs (16 Nov live run): the
+ * router model misses its budget, and the answer model searches on its own whenever it is given a tool.
+ */
+export function offlineModels(clock: FakeClock): { llm: LLM; search: SearchProvider } {
+  const search = new FakeSearch(clock);
+  return { llm: new FakeLLM(new FakeSearch(clock), { slowRouter: true }), search };
+}
 
 export interface StepReport {
   scenario: string;
@@ -208,21 +232,13 @@ export async function runScenario(
   const clock = new FakeClock(scenario.steps[0]!.at);
   const { llm, search } = make(clock);
   let searchCount = 0;
-  // Counts searches without changing how the provider is used (batching stays batching).
+  // Counts the searches the agent runs (one provider call per query).
   const counting: SearchProvider = {
     name: search.name,
     search: (q, o) => {
       searchCount++;
       return search.search(q, o);
     },
-    ...(search.searchBatch
-      ? {
-          searchBatch: (items: Parameters<NonNullable<SearchProvider["searchBatch"]>>[0], signal?: AbortSignal) => {
-            searchCount += items.length;
-            return search.searchBatch!(items, signal);
-          },
-        }
-      : {}),
   };
   const store = new Store(":memory:");
   const agent = new Agent({ store, llm, search: counting, clock, timezone: opts.timezone ?? "Asia/Kolkata", watch: { enabled: true, afterDays: 3, maxSearches: 3 } });
@@ -276,7 +292,9 @@ async function collect(events: AsyncGenerator<AgentEvent>): Promise<TurnResult> 
     } else if (ev.type === "sources") r.sources = ev.sources;
     else if (ev.type === "warning") r.warnings.push(ev.text);
     else if (ev.type === "done") {
+      r.firstStatusMs = ev.timings.firstStatusMs;
       r.firstTokenMs = ev.timings.firstTokenMs;
+      r.firstModelTokenMs = ev.timings.firstModelTokenMs;
       r.totalMs = ev.timings.totalMs;
     }
   }

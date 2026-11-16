@@ -19,31 +19,29 @@ export interface QueryRun {
   ms: number;
 }
 
+/**
+ * Runs every query at once, each as its own search (latency is the slowest search, not the sum).
+ * `onRun` fires as each one finishes, so the caller can show progress while the rest are running.
+ */
 export async function runQueries(
   provider: SearchProvider,
   queries: Array<{ query: string; purpose: string; opts?: SearchOptions }>,
   signal?: AbortSignal,
+  onRun?: (run: QueryRun, done: number, total: number) => void,
 ): Promise<QueryRun[]> {
-  // Providers that can batch (Anthropic web_search) get all queries in one round trip.
-  if (provider.searchBatch && queries.length > 1) {
-    const t0 = Date.now();
-    try {
-      const lists = await provider.searchBatch(queries.map(({ query, opts }) => ({ query, opts })), signal);
-      return queries.map(({ query, purpose }, i) => ({ query, purpose, results: lists[i] ?? [], ms: Date.now() - t0 }));
-    } catch (e) {
-      return queries.map(({ query, purpose }) => ({ query, purpose, results: [], error: (e as Error).message, ms: Date.now() - t0 }));
-    }
-  }
-  // Otherwise all in parallel: latency is the slowest search, not the sum.
+  let done = 0;
   return Promise.all(
     queries.map(async ({ query, purpose, opts }) => {
       const t0 = Date.now();
+      let run: QueryRun;
       try {
         const results = await provider.search(query, { ...opts, signal });
-        return { query, purpose, results, ms: Date.now() - t0 };
+        run = { query, purpose, results, ms: Date.now() - t0 };
       } catch (e) {
-        return { query, purpose, results: [], error: (e as Error).message, ms: Date.now() - t0 };
+        run = { query, purpose, results: [], error: (e as Error).message, ms: Date.now() - t0 };
       }
+      onRun?.(run, ++done, queries.length);
+      return run;
     }),
   );
 }
@@ -67,7 +65,7 @@ export function isOfficialFor(url: string, subjects: string[]): boolean {
   });
 }
 
-export function rankSources(runs: QueryRun[], subjects: string[], nowMs: number, limit = 8): Source[] {
+export function rankSources(runs: QueryRun[], subjects: string[], nowMs: number, limit = 8, opts: { coverEachQuery?: boolean } = {}): Source[] {
   const byUrl = new Map<string, { r: SearchResult; query: string; score: number }>();
   runs.forEach((run) => {
     run.results.forEach((r, i) => {
@@ -87,9 +85,22 @@ export function rankSources(runs: QueryRun[], subjects: string[], nowMs: number,
       if (!prev || prev.score < score) byUrl.set(key, { r, query: run.query, score: prev ? Math.max(prev.score, score) + 0.2 : score });
     });
   });
-  return [...byUrl.values()]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
+  const sorted = [...byUrl.values()].sort((a, b) => b.score - a.score);
+  let picked = sorted.slice(0, limit);
+  if (opts.coverEachQuery) {
+    // First the best page of every query (one per product of a comparison), then the rest by score.
+    const keyOf = (u: string) => u.replace(/[#?].*$/, "").replace(/\/$/, "");
+    const must = new Set<(typeof sorted)[number]>();
+    for (const run of runs) {
+      const urls = new Set(run.results.map((r) => keyOf(r.url)));
+      const best = sorted.find((x) => urls.has(keyOf(x.r.url)));
+      if (best) must.add(best);
+    }
+    const chosen = new Set([...must].slice(0, Math.max(limit, must.size)));
+    for (const x of sorted) if (chosen.size < limit) chosen.add(x);
+    picked = sorted.filter((x) => chosen.has(x));
+  }
+  return picked
     .map(({ r, query }, i) => ({
       ...r,
       n: i + 1,
