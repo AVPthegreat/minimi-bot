@@ -37,6 +37,8 @@ export interface PastTurn {
   question: string;
   answer: string;
   claims: ClaimRow[];
+  /** How the earlier question was routed ("chat" = small talk: nothing factual to re-check). */
+  intent?: string;
 }
 
 export interface AnswerInput {

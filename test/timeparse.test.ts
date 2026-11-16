@@ -84,3 +84,19 @@ test("product names and verbs are not dates: Monday.com, 'I may 2 more'", () => 
   assert.deepEqual(days("I may 2 more seats"), []);
   assert.deepEqual(days("on May 2"), [["2026-05-02..2026-05-02"]]);
 });
+
+test("parts of a day narrow the window: 'yesterday evening', 'last night' (past midnight)", () => {
+  const r = parseTimeRefs("what did I ask yesterday evening?", WED, TZ).refs[0]!;
+  assert.equal(r.candidates[0]!.label, "Tue 17 Nov, evening");
+  assert.equal(r.candidates[0]!.start, Date.parse("2026-11-17T17:00:00+05:30"));
+  assert.equal(r.candidates[0]!.end, Date.parse("2026-11-18T00:00:00+05:30"));
+  const n = parseTimeRefs("what did we discuss last night", WED, TZ).refs[0]!;
+  assert.equal(n.candidates[0]!.end, Date.parse("2026-11-18T04:00:00+05:30"));
+  assert.equal(parseTimeRefs("what did I ask yesterday evening?", WED, TZ).rest, "what did I ask ?");
+});
+
+test("'on the 3rd' is the most recent 3rd; 'the 2nd tier' is not a date", () => {
+  assert.deepEqual(days("what did I ask on the 3rd?"), [["2026-11-03..2026-11-03"]]);
+  assert.deepEqual(days("what did I ask on the 21st?"), [["2026-10-21..2026-10-21"]]);
+  assert.deepEqual(days("is the 2nd tier worth it?"), []);
+});

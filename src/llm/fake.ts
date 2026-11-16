@@ -7,7 +7,7 @@
 //     quoting them (so dates and quotes must be rendered by code);
 //   - `slowRouter`: the router model misses its budget (the agent falls back), as Haiku did live.
 
-import { grammarClaims } from "../claims.ts";
+import { grammarClaims, parseValue, questionMultipliers, sameValue } from "../claims.ts";
 import type { NewClaim } from "../db.ts";
 import { rulesRoute, stopwordsTopic } from "../router.ts";
 import type { SearchProvider } from "../search/types.ts";
@@ -63,7 +63,7 @@ export class FakeLLM implements LLM {
   private compose(input: AnswerInput): string {
     const out: string[] = [];
     if (input.intent === "chat") {
-      out.push("Hi! I'm running in fake mode (no API keys), so my answers come from a small offline test web. Ask me about Postgres hosting or CRM pricing, then ask me about it again on another day.");
+      out.push("Hi! I'm Minimi, a chat assistant with web search and a dated memory of our conversations. I'm running in fake mode (no API keys), so my answers come from a small offline test web. Ask me about Postgres hosting or CRM pricing, then ask me about it again on another day.");
       return out.join("\n\n");
     }
     if (input.intent === "recall" || input.intent === "verify") {
@@ -101,6 +101,21 @@ export class FakeLLM implements LLM {
         else lines.push(`- ${s.title} [${s.n}]`);
       }
       out.push(lines.join("\n"));
+      // Like the real model (system prompt): totals shown with the sourced unit price, and disagreements named.
+      const facts = input.sources.slice(0, 6).flatMap((s) => grammarClaims(s.snippet).map((f) => ({ ...f, n: s.n })));
+      const seats = questionMultipliers(input.question)[0];
+      const extra: string[] = [];
+      for (const f of facts) {
+        const a = parseValue(f.value).amount;
+        if (seats && a !== null && /per (user|seat)/i.test(f.unit ?? "")) {
+          extra.push(`- ${f.subject} ${f.attribute.replace(/ price$/, "")} for ${seats} seats: ${seats} x ${f.value} [${f.n}] = $${(seats * a).toLocaleString("en-US")} per month`);
+        }
+      }
+      for (const [i, f] of facts.entries()) {
+        const other = facts.slice(i + 1).find((g) => g.subject === f.subject && g.attribute === f.attribute && !sameValue(g.value, f.value));
+        if (other) extra.push(`Sources disagree on ${f.subject} ${f.attribute}: ${f.value} [${f.n}] vs ${other.value} [${other.n}].`);
+      }
+      if (extra.length) out.push(extra.join("\n"));
     }
     return out.join("\n\n");
   }

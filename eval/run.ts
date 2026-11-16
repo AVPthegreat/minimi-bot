@@ -22,6 +22,8 @@ const only = process.env.EVAL_ONLY;
 
 let failed = 0;
 let passed = 0;
+let unverifiedPrices = 0;
+let answersWithUnverified = 0;
 const all: StepReport[] = [];
 for (const sc of SCENARIOS.filter((s) => !only || s.name === only)) {
   if (live && meter.limitUsd !== null && meter.costUsd >= meter.limitUsd) {
@@ -43,14 +45,20 @@ for (const sc of SCENARIOS.filter((s) => !only || s.name === only)) {
       : ` | first status ${ms(r.result.firstStatusMs)}, first text ${ms(r.result.firstTokenMs)}, first model token ${ms(r.result.firstModelTokenMs)}, total ${r.result.totalMs} ms`;
     console.log(`  ${r.step}. "${r.say}" -> ${r.result.intent ?? "nudge"} | ${r.result.searches} searches${t}`);
     for (const c of r.checks) {
-      if (c.skipped) console.log(`     -  ${c.name} (skipped live)`);
+      if (c.skipped) console.log(`     -  ${c.name} (skipped ${live ? "live" : "offline"})`);
       else if (c.pass) (passed++, console.log(`     ok ${c.name}`));
       else (failed++, console.log(`     FAIL ${c.name}`));
+    }
+    if (r.result.unverified.length) {
+      unverifiedPrices += r.result.unverified.length;
+      answersWithUnverified++;
+      console.log(`     ~  shown as unverified (honest, not a failure): ${r.result.unverified.join(", ")}`);
     }
     if (process.env.EVAL_VERBOSE) console.log(r.result.text.replace(/^/gm, "       | "));
   }
 }
 console.log(`\n${passed} passed, ${failed} failed (${live ? `live, search: ${cfg.searchProvider}` : "offline"})`);
+console.log(`Prices the guard could not source and showed as "(unverified)": ${unverifiedPrices} in ${answersWithUnverified} answer${answersWithUnverified === 1 ? "" : "s"}`);
 if (live) console.log(`Spend: ${meter.summary()}`);
 if (live || process.env.EVAL_RESULTS === "1") {
   const file = writeResults(all);
@@ -92,6 +100,7 @@ function writeResults(reports: StepReport[]): string {
     at: new Date().toISOString(),
     models: live ? { answer: cfg.answerModel, fast: cfg.fastModel, search: cfg.searchProvider, searchModel: cfg.searchModel } : "fake",
     checks: { passed, failed },
+    unverifiedPrices: { count: unverifiedPrices, answers: answersWithUnverified },
     spendUsd: +meter.costUsd.toFixed(4),
     spend: meter.summary(),
     latency,
@@ -107,6 +116,7 @@ function writeResults(reports: StepReport[]): string {
       searches: r.result.searches,
       failedChecks: r.checks.filter((c) => !c.pass).map((c) => c.name),
       warnings: r.result.warnings,
+      unverified: r.result.unverified,
       // The answer and its sources, so a failed live check can be diagnosed line by line.
       text: r.result.text,
       sources: r.result.sources,
@@ -121,6 +131,7 @@ function writeResults(reports: StepReport[]): string {
     `# Eval results (${result.mode}, ${result.at})`,
     "",
     `Checks: ${passed} passed, ${failed} failed. Spend: $${result.spendUsd.toFixed(2)} (${result.spend}).`,
+    `Prices shown as "(unverified)" (honest, not failures): ${unverifiedPrices} in ${answersWithUnverified} answers.`,
     "",
     "| Question type | Turns | First status p50 | First text p50 | p95 | First model token p50 | p95 | Total p50 | p95 | Searches/turn |",
     "|---|---|---|---|---|---|---|---|---|---|",

@@ -41,6 +41,9 @@ const NUMBER_WORDS: Record<string, number> = {
   eleven: 11, twelve: 12, couple: 2, few: 3,
 };
 
+/** Parts of a day, as local hours [from, to) (night runs past midnight). */
+const PARTS = { morning: [5, 12], afternoon: [12, 17], evening: [17, 24], night: [20, 28] } as const;
+
 function dayRange(c: CivilDate, tz: string, today: CivilDate): TimeRange {
   return { start: startOfDay(c, tz), end: startOfDay(addDays(c, 1), tz), label: formatCivil(c, today) };
 }
@@ -107,6 +110,32 @@ const RULES: Rule[] = [
       if (m[1] === "may") return null;
       const c = pastDate(Number(m[2]), monthFromToken(m[1]!), m[3] ? Number(m[3]) : null, today);
       return c ? { candidates: [dayRange(c, tz, today)] } : null;
+    },
+  },
+  {
+    // "yesterday evening", "this morning", "last night": the day, narrowed to that part of it.
+    re: /\b(?:(yesterday|today|this)\s+(morning|afternoon|evening|night)|(last)\s+(night)|(tonight))\b/gi,
+    resolve: (m, today, tz) => {
+      const day = (m[1] ?? m[3] ?? "").toLowerCase() === "yesterday" || m[3] ? addDays(today, -1) : today;
+      const part = (m[2] ?? m[4] ?? "evening").toLowerCase() as keyof typeof PARTS;
+      const [from, to] = PARTS[part];
+      const start = startOfDay(day, tz) + from * 3600000;
+      return { candidates: [{ start, end: startOfDay(day, tz) + to * 3600000, label: `${formatCivil(day, today)}, ${part}` }] };
+    },
+  },
+  {
+    // "on the 3rd", "the 21st": the most recent such day of a month, on or before today.
+    re: /\b(?:on\s+)?the\s+(\d{1,2})(st|nd|rd|th)\b(?!\s+(?:\w+\s+)?(?:plan|tier|item|place|time|option|one|cheapest|most|best|largest|biggest)\b)/gi,
+    resolve: (m, today, tz) => {
+      const d = Number(m[1]);
+      if (d < 1 || d > 31) return null;
+      for (let back = 0; back < 3; back++) {
+        const month = ((today.m - 1 - back + 12) % 12) + 1;
+        const y = today.m - back <= 0 ? today.y - 1 : today.y;
+        const c = pastDate(d, month, y, today);
+        if (c && compareCivil(c, today) <= 0) return { candidates: [dayRange(c, tz, today)] };
+      }
+      return null;
     },
   },
   {

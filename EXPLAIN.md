@@ -105,6 +105,13 @@ kept, marked "(unverified)", and short names ("Zoho") are filed as "Zoho CRM"; (
 per subject, the rest stayed due and the next chat searched again: now every fact of a checked subject is checked
 (same search), and only the table is capped.
 
+**Third live run (33 of 36), and a bug the founder hit.** (a) A message with its own new question plus "is that still
+correct?" now answers that question; "still correct?" after small talk says there is nothing to re-check, with no search.
+(b) A price belongs to the product named in its own clause, or the one named last before it, or the source it cites, so
+"All five sources agree on the $5" is backed and only numbers no source states get "(unverified)". (c) "Changed" means
+the value changed; "was unverified, now sourced" shows as "Unchanged, now confirmed". The eval counts honest
+"(unverified)" prices apart and fails only on a price shown as fact with no gathered source.
+
 **Interview lines:** "Why did offline pass and live fail?" Because the fake models were too cooperative; I made the
 fakes as unhelpful as the real ones and added a test per live failure. "Where does grounding live?" In code: a
 streaming guard, not a prompt rule. "Who decides what to search?" The agent, in code; models only fill gaps.

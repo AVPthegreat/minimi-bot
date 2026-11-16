@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { BrandBook } from "./brand.ts";
 import { type EvidenceDoc, priceChecker, questionMultipliers, renderDiffTable, sameValue, summarizeDiff } from "./claims.ts";
 import { GroundingGuard } from "./grounding.ts";
-import { canonicalSubject, fairCap, planSubjects, subjectQueries } from "./planner.ts";
+import { NOT_NAMES, canonicalSubject, fairCap, planSubjects, subjectQueries } from "./planner.ts";
 import type { ClaimRow, SessionRow, Store } from "./db.ts";
 import type { AnswerInput, Intent, LLM, PastTurn, RoutePlan } from "./llm/types.ts";
 import { recall, toPastTurn } from "./memory.ts";
@@ -163,9 +163,12 @@ export class Agent {
     // (speculative) plus, for a comparison, one search per subject named in the message (read by code).
     // If the router says no search is needed, they are cancelled.
     const routeInput = { text, rest: parsed.rest, nowLabel, history, timePhrases: parsed.refs.map((r) => r.phrase) };
-    const undecided = rulesRoute(text, parsed.refs.length > 0, history.length > 0, parsed.rest) === null;
-    const specQuery = text.slice(0, 300);
-    const subjects = undecided ? planSubjects(parsed.rest) : [];
+    const rules = rulesRoute(text, parsed.refs.length > 0, history.length > 0, parsed.rest);
+    // Rules that already know it is a web question (a new question inside a follow-up) plan like an
+    // undecided message, but on that question only.
+    const undecided = rules === null || rules.intent === "search";
+    const specQuery = rules?.intent === "search" ? rules.searchQueries[0]! : text.slice(0, 300);
+    const subjects = undecided ? planSubjects(rules?.intent === "search" ? specQuery : parsed.rest) : [];
     const planned = undecided
       ? [
           { query: specQuery, purpose: "speculative", opts: { maxResults: 5 } },
@@ -217,6 +220,8 @@ export class Agent {
     let diff: AnswerInput["diff"];
     const runs: QueryRun[] = [];
     let recheckToSave: Parameters<typeof saveRecheck>[1] | null = null;
+    /** The code-rendered lines are the whole answer (nothing to ask the model). */
+    let answeredByCode = false;
     const intent: Intent = plan.intent;
 
     try {
@@ -253,6 +258,11 @@ export class Agent {
           const more = hidden ? [`(${hidden} more fact${hidden > 1 ? "s" : ""} checked: ${countBy(outcome.rows.filter((r) => !rows.includes(r)))}.)`] : [];
           const ev = show([summarizeDiff(outcome.rows, thenLabel), table, ...more]);
           if (ev) yield ev;
+        } else if (plan.intent === "verify" && memory.length && memory.every((t) => t.intent === "chat")) {
+          // Small talk ("hi", "who made you") states no checkable fact: searching it again finds noise.
+          const ev = show([`That was small talk ("${memory[0]!.question.replace(/\s+/g, " ").slice(0, 80)}"), so there's nothing factual in my answer to re-check. Ask me a question about prices, plans or releases and I can check it against current sources.`]);
+          if (ev) yield ev;
+          answeredByCode = true;
         } else if (plan.intent === "verify" && memory.length) {
           // The earlier answer had no stored facts: search the earlier question again and let the
           // model compare old answer and fresh sources.
@@ -319,7 +329,7 @@ export class Agent {
     // "(unverified)" before the user sees it. Old answers are not evidence for today's prices; only a
     // pure recall answer may quote them, as history.
     const evidence = (): EvidenceDoc[] => [
-      ...sources.map((x) => ({ text: `${x.title}\n${x.snippet}`, about: x.query === specQuery ? x.title : `${x.title} ${x.query}` })),
+      ...sources.map((x) => ({ n: x.n, text: `${x.title}\n${x.snippet}`, about: `${siteName(x.url)} ${x.query === specQuery ? x.title : `${x.title} ${x.query}`}` })),
       { text: diff?.table ?? "" },
       // What was said before (the earlier answer, earlier in this chat) backs a price only as history:
       // fully in a recall answer, and elsewhere only where the sentence says it was the price then.
@@ -327,7 +337,15 @@ export class Agent {
       ...history.filter((m) => m.role === "assistant").map((m) => ({ text: m.content, pastOnly: intent !== "recall" })),
     ];
     const multipliers = questionMultipliers(text);
-    const guard = new GroundingGuard((line) => priceChecker(evidence(), { multipliers })(line));
+    // The products this turn is about: what decides which product a price belongs to.
+    const names = (): string[] => [
+      ...subjects,
+      ...productWords(rules?.intent === "search" ? specQuery : parsed.rest),
+      ...memory.flatMap((t) => [...t.claims.map((c) => c.subject), ...productWords(t.question)]),
+      ...(diff?.rows.map((r) => r.subject) ?? []),
+      ...sources.map((x) => siteName(x.url)),
+    ];
+    const guard = new GroundingGuard((line, before) => priceChecker(evidence(), { multipliers, names: names() })(line, `${shown.join("\n")}\n${before}`));
     const out = (t: string): AgentEvent | null => {
       const safe = guard.push(t);
       if (!safe) return null;
@@ -338,9 +356,9 @@ export class Agent {
     };
     try {
       if (signal?.aborted) throw new Error("stopped");
-      for await (const ev of llm.streamAnswer({
+      if (!answeredByCode) for await (const ev of llm.streamAnswer({
         intent: intent === "updates" ? "verify" : intent,
-        question: text,
+        question: rules?.intent === "search" ? specQuery : text,
         nowLabel,
         history,
         sources,
@@ -420,7 +438,7 @@ export class Agent {
     // agent searched for, every product of a shortlist covered, and never a price marked unverified.
     if (!stopped && (intent === "search" || (intent === "verify" && !recheckToSave)) && sources.length && answer) {
       this.background(
-        llm.extractClaims({ question: text, answer, sources }).then((claims) => {
+        llm.extractClaims({ question: rules?.intent === "search" ? specQuery : text, answer, sources }).then((claims) => {
           const known = fairCap(
             claims
               .filter((c) => c.subject && c.attribute && c.value)
@@ -443,6 +461,17 @@ export class Agent {
     const tracked = p.catch((e: Error) => console.error(`[background] ${e.message}`)).finally(() => this.pending.delete(tracked));
     this.pending.add(tracked);
   }
+}
+
+/** The site's own name: "docs.railway.com" -> "railway", "neon.com" -> "neon". */
+function siteName(url: string): string {
+  const parts = domainOf(url).split(".");
+  return parts.length >= 2 ? parts[parts.length - 2]! : parts[0]!;
+}
+
+/** Capitalised words of a question that are not sentence openers or dates ("Cloudflare", "Workers"). */
+function productWords(text: string): string[] {
+  return [...text.matchAll(/(?<![.!?]\s|^)\b[A-Z][\w.+&-]{2,}/g)].map((m) => m[0]).filter((w) => !NOT_NAMES.has(w));
 }
 
 function sameQuery(a: string, b: string): boolean {

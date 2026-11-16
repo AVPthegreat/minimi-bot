@@ -30,7 +30,7 @@ missed its 1.5 s cap, the plan collapsed to one query, and Opus searched on its 
 
 **Getting it right.** Official and recent pages rank first. Grounding is enforced in code while the answer streams:
 a sentence or table row with a price is held until complete and checked against the gathered sources (amount,
-currency, the product it belongs to, the source's title); a total is accepted only as a sourced price times a number
+currency, the product it belongs to: named in its clause, else the last one named, or in the source it cites); a total is accepted only as a sourced price times a number
 the user gave ("20 seats x $14 [2] = $280"); an earlier answer backs a price only when stated as past ("was $19").
 Snippets are the search model's verbatim citations plus its quoted bullets for URLs it returned. An unsupported
 price is shown as "$X (unverified)", warned about, and tracked only as unverified, so the next re-check settles it. How a date was read, the quoted earlier question and the then/now table are rendered by code,
@@ -68,9 +68,11 @@ result count, the product's site) next to the old status lines, so older clients
 sniffed as raster images, size/time capped, cached in memory and on disk, a letter tile otherwise. Glass panels fall
 back to solid under `prefers-reduced-transparency` or without `backdrop-filter`; text tokens pass AA on the worst-case aurora.
 
-**Eval.** `eval/scenarios.ts` replays multi-day conversations (the three example questions, nudges, fast paths) on a
-fake clock against a fixture web whose prices change on known dates: 48 checks, offline in `npm test`, plus a test
-per failure of the first live run (`test/livegaps.test.ts`).
+**Eval.** `eval/scenarios.ts` replays multi-day conversations on a fake clock against a fixture web whose prices
+change on known dates: the three example questions, nudges, time phrases (late night IST, "the 3rd", "yesterday
+evening"), same-day recall, small talk vs. a new question, rupees, contradicting sources, team totals, prompt
+injection, nothing-changed: 131 checks offline, in `npm test`. "No price shown as fact without a source" is checked
+independently of the guard; honest "(unverified)" prices are counted apart. Plus a test per live failure.
 
 **With another week:** read full official pages and require two sources for high-stakes numbers; a macOS background
 scheduler for nudges; embeddings for paraphrased recall; a nightly live eval graded by a judge model.
