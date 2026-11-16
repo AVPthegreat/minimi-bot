@@ -8,6 +8,12 @@ import type { LLM, RouteInput, RoutePlan } from "./llm/types.ts";
 const CHITCHAT =
   /^\s*(hi|hello|hey|yo|hiya|thanks|thank you|thx|ok|okay|cool|great|nice|good (morning|afternoon|evening|night)|bye|see you|who are you|what are you|who (made|built|created|trained) you|what can you do)\b[\s!.?,a-z]{0,20}$/i;
 
+// Arithmetic and definitions of ordinary words need no web search ("What is 17% of 2,340?", "What does idempotent mean?").
+const NUM = String.raw`[\d.,]+`;
+const OP = String.raw`(?:%\s*of|[+\-*/x×÷^]|times|divided by|plus|minus)`;
+const MATH = new RegExp(String.raw`^\s*(?:what(?:'s| is)\s+|calculate\s+|compute\s+)?${NUM}\s*${OP}\s*${NUM}(?:\s*${OP}\s*${NUM})*\s*[?=]?\s*$`, "i");
+const DEFINE = /^\s*(?:[Ww]hat does|[Ww]hat's the meaning of|[Ww]hat is the meaning of|[Dd]efine|[Mm]eaning of)\s+["']?[a-z][a-z-]{2,30}["']?(?:\s+mean)?\s*\??\s*$/;
+
 const RECALL =
   /\b(what (did|have) (i|we) (ask|asked|say|said|talk|talked|discuss|discussed)|what (i|we) (asked|said|talked about|discussed)|did i (ask|mention|say)|when did i (ask|mention)|what (was|were) (my|our) (question|questions)|what did you (say|tell|answer|recommend)|remind me what|what have we (talked|discussed))\b/i;
 
@@ -41,7 +47,7 @@ const TOPIC_STOP = new Set(
 /** Rules-only routing. Returns null when the rules are not sure (the model decides then). */
 export function rulesRoute(text: string, hasTimeRef: boolean, hasHistory: boolean, rest = text): Omit<RoutePlan, "via"> | null {
   const topic = stopwordsTopic(rest);
-  if (CHITCHAT.test(text)) {
+  if (CHITCHAT.test(text) || MATH.test(text) || DEFINE.test(text)) {
     return { intent: "chat", memoryQuery: "", searchQueries: [], sinceDays: 0, highStakes: false };
   }
   if (UPDATES.test(text) && !/\b(in|about|with|for)\s+[a-z]/i.test(text)) {
