@@ -3,7 +3,7 @@
 A chat agent that searches the web, remembers **what you asked and when**, re-checks its own past answers, and
 pings you with one line only when something you asked about has changed enough to matter now.
 
-**Live demo: https://minimi.faurus.app**
+**Live demo: https://minimi.15-252-108-184.sslip.io** (no key needed; each visitor gets a private Minimi)
 
 ![minimi bot: the home screen](docs/screens/home.jpg)
 
