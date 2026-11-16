@@ -131,6 +131,7 @@ export class FakeLLM implements LLM {
   }
 
   async recheck(input: Parameters<LLM["recheck"]>[0]): Promise<Array<RecheckResult | null>> {
+    if (input.signal?.aborted) throw new DOMException("The re-check was cancelled.", "AbortError");
     return input.claims.map((c) => {
       for (const s of input.sources) {
         const hit = grammarClaims(s.snippet).find(

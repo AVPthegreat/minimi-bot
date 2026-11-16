@@ -33,7 +33,7 @@ export class AnthropicLLM implements LLM {
   }
 
   /** One structured-output call to the small model; returns the parsed JSON. */
-  private async json<T>(system: string, user: string, schema: object, timeoutMs: number, maxTokens = 2048): Promise<T> {
+  private async json<T>(system: string, user: string, schema: object, timeoutMs: number, maxTokens = 2048, signal?: AbortSignal): Promise<T> {
     this.opts.meter?.check();
     const res = await this.client.messages.create(
       {
@@ -43,7 +43,7 @@ export class AnthropicLLM implements LLM {
         messages: [{ role: "user", content: user }],
         output_config: { effort: "low", format: { type: "json_schema", schema: schema as Record<string, unknown> } },
       },
-      { timeout: timeoutMs, maxRetries: 1 },
+      { timeout: timeoutMs, maxRetries: 1, signal },
     );
     this.opts.meter?.add(this.opts.fastModel, res.usage);
     if (res.stop_reason === "refusal" || res.stop_reason === "max_tokens") throw new Error(`small model stopped: ${res.stop_reason}`);
@@ -147,7 +147,7 @@ export class AnthropicLLM implements LLM {
     if (input.claims.length === 0) return [];
     if (input.sources.length === 0) return input.claims.map(() => null);
     const r = await this.json<{ results: Array<{ fact: number; found: boolean; value: string; unit: string; source_n: number }> }>(
-      RECHECK_SYSTEM, renderRecheck(input.claims, input.sources), RECHECK_SCHEMA, 15000, 4096,
+      RECHECK_SYSTEM, renderRecheck(input.claims, input.sources), RECHECK_SCHEMA, 15000, 4096, input.signal,
     );
     return input.claims.map((_, i) => {
       const hit = r.results.find((x) => x.fact === i + 1);

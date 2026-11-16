@@ -81,7 +81,8 @@ export async function recheckClaims(
   const sources = rankSources(runs, subjects, opts.nowMs, 12);
   let found: Awaited<ReturnType<LLM["recheck"]>>;
   try {
-    found = await deps.llm.recheck({ claims, sources });
+    if (opts.signal?.aborted) throw new Error("cancelled"); // no paid model call for a caller that gave up
+    found = await deps.llm.recheck({ claims, sources, signal: opts.signal });
   } catch {
     found = claims.map(() => null); // the model failed: report "couldn't verify", never a guess
   }
