@@ -31,7 +31,8 @@ export class BrandBook {
 
   /**
    * The domain to show for a finished search: the subject's own site among the results (learned for
-   * next time), else the top result's site.
+   * next time), else the known one. Never just the top result: a blog's logo next to "Neon pricing"
+   * would suggest the wrong owner.
    */
   fromResults(query: string, results: SearchResult[]): string | undefined {
     const own = results.find((r) => isOfficialFor(r.url, [query]));
@@ -41,6 +42,6 @@ export class BrandBook {
       this.learned.set(key, domainOf(own.url));
       return domainOf(own.url);
     }
-    return this.domainFor(query) ?? (results[0] ? domainOf(results[0].url) : undefined);
+    return this.domainFor(query);
   }
 }

@@ -82,7 +82,7 @@ test("brand book: seeded names, learned official sites, and the top result other
   assert.equal(b.domainFor("What does it cost?"), undefined);
   assert.equal(b.fromResults("Acmebase pricing", [{ title: "x", url: "https://blog.example.org/a", snippet: "" }, { title: "y", url: "https://www.acmebase.io/pricing", snippet: "" }]), "acmebase.io");
   assert.equal(b.domainFor("Acmebase plans"), "acmebase.io");
-  assert.equal(b.fromResults("Postgres hosting", [{ title: "x", url: "https://www.example.org/a", snippet: "" }]), "example.org");
+  assert.equal(b.fromResults("Postgres hosting", [{ title: "x", url: "https://www.example.org/a", snippet: "" }]), undefined, "no logo rather than a stranger's");
 });
 
 // ---- Logos: only public hostnames, only real images, cached, with a letter tile when there is none.
