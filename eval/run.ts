@@ -45,7 +45,7 @@ for (const sc of SCENARIOS.filter((s) => !only || s.name === only)) {
       : ` | first status ${ms(r.result.firstStatusMs)}, first text ${ms(r.result.firstTokenMs)}, first model token ${ms(r.result.firstModelTokenMs)}, total ${r.result.totalMs} ms`;
     console.log(`  ${r.step}. "${r.say}" -> ${r.result.intent ?? "nudge"} | ${r.result.searches} searches${t}`);
     for (const c of r.checks) {
-      if (c.skipped) console.log(`     -  ${c.name} (skipped live)`);
+      if (c.skipped) console.log(`     -  ${c.name} (skipped ${live ? "live" : "offline"})`);
       else if (c.pass) (passed++, console.log(`     ok ${c.name}`));
       else (failed++, console.log(`     FAIL ${c.name}`));
     }
