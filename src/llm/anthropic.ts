@@ -4,7 +4,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { Effort } from "../config.ts";
-import { pageAge } from "../search/anthropic.ts";
+import { pageAge, webSearchTool } from "../search/anthropic.ts";
 import type { UsageMeter } from "../usage.ts";
 import type { NewClaim } from "../db.ts";
 import {
@@ -76,7 +76,7 @@ export class AnthropicLLM implements LLM {
     this.opts.meter?.check();
     const effort: Effort = input.intent === "chat" || input.intent === "recall" ? "low" : this.opts.answerEffort;
     const tools: Anthropic.Beta.BetaToolUnion[] =
-      input.maxSelfSearches > 0 ? [{ type: "web_search_20260209", name: "web_search", max_uses: input.maxSelfSearches }] : [];
+      input.maxSelfSearches > 0 ? [{ type: webSearchTool(this.opts.answerModel), name: "web_search", max_uses: input.maxSelfSearches }] : [];
     const stream = this.client.beta.messages.stream(
       {
         model: this.opts.answerModel,

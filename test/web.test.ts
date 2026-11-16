@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ApiError, createSSEParser } from "../public/js/api.js";
 import { markdown } from "../public/js/markdown.js";
+import { AnthropicWebSearch, WEB_SEARCH_TOOL, WEB_SEARCH_TOOL_BASIC, webSearchTool } from "../src/search/anthropic.ts";
 import { daysAgo, groupSessions, localInputValue, nowChip, shortWhen, zonedToUtc } from "../public/js/time.js";
 
 const TZ = "Asia/Kolkata";
@@ -107,4 +108,16 @@ test("dates: the demo clock input round-trips in the agent's timezone", () => {
   assert.equal(localInputValue(ms, TZ), "2026-11-18T09:00");
   assert.equal(zonedToUtc("2026-11-18T09:00", TZ), ms);
   assert.equal(zonedToUtc("2026-07-01T12:00", "America/New_York"), at("2026-07-01T12:00:00-04:00"));
+});
+
+test("one rule picks the web_search tool version for answers and searches: the newer one wherever the model supports it", async () => {
+  assert.equal(webSearchTool("claude-opus-5-5"), WEB_SEARCH_TOOL);
+  assert.equal(webSearchTool("claude-sonnet-4-6"), WEB_SEARCH_TOOL);
+  assert.equal(webSearchTool("claude-fable-5-2"), WEB_SEARCH_TOOL);
+  assert.equal(webSearchTool("claude-haiku-5-5"), WEB_SEARCH_TOOL_BASIC);
+  assert.equal(webSearchTool("claude-opus-4-5"), WEB_SEARCH_TOOL_BASIC);
+  const sent: string[] = [];
+  const client = { messages: { create: async (p: { tools: Array<{ type: string }> }) => (sent.push(p.tools[0]!.type), { content: [], usage: {} }) } };
+  for (const model of ["claude-opus-5-5", "claude-haiku-5-5"]) await new AnthropicWebSearch(client as never, model).search("x").catch(() => []);
+  assert.deepEqual(sent, [WEB_SEARCH_TOOL, WEB_SEARCH_TOOL_BASIC]);
 });
