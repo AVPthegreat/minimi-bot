@@ -28,8 +28,15 @@ export const ICONS = {
   memory: svg('<path d="M9 4.5a3 3 0 0 0-3 3v.2A3.2 3.2 0 0 0 4 10.6a3.2 3.2 0 0 0 1 2.4 3.2 3.2 0 0 0 1.6 5A3 3 0 0 0 12 19.5V6a1.6 1.6 0 0 0-3-1.5Z"/><path d="M15 4.5a3 3 0 0 1 3 3v.2a3.2 3.2 0 0 1 2 2.9 3.2 3.2 0 0 1-1 2.4 3.2 3.2 0 0 1-1.6 5A3 3 0 0 1 12 19.5"/>'),
   chat: svg('<path d="M5 18.5V6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H9Z"/>'),
   external: svg('<path d="M14 5h5v5M19 5l-8 8M17 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"/>'),
+  chart: svg('<path d="M4 19.5h16"/><path d="M7 16v-4M12 16V7M17 16v-6"/>'),
+  doc: svg('<path d="M7 3.5h7l4.5 4.5v12.5H7Z"/><path d="M14 3.5V8h4.5M10 12.5h5M10 16h5"/>'),
+  arrowLeft: svg('<path d="M19 12H5M11 6l-6 6 6 6"/>'),
   offline: svg('<path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 4-2.3M12 10a10 10 0 0 1 7 3M2 9.5a15 15 0 0 1 5-2.9M11 5.5a15 15 0 0 1 11 4"/>'),
 };
+
+/** Our own sitting-cat mark (filled, currentColor). The eyes take the surface colour behind them. */
+export const CAT =
+  '<svg class="cat" viewBox="0 0 32 28" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8.6 1.5 12.4 6.1Q16 5.2 19.6 6.1L23.4 1.5 24.6 9.6Q25.4 14.6 21.6 16.6H10.4Q6.6 14.6 7.4 9.6Z"/><path fill="currentColor" d="M9.6 15.6Q5.6 20 6.6 27h18.8q1-7-3-11.4Z"/><path d="M25 26.6q5.4-1.6 4.4-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><ellipse class="cat-eye" cx="12.9" cy="11" rx="1.15" ry="1.5"/><ellipse class="cat-eye" cx="19.1" cy="11" rx="1.15" ry="1.5"/></svg>';
 
 /** Fills every `[data-icon]` placeholder under `root` with its icon. */
 export function hydrateIcons(root = document) {

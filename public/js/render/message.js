@@ -1,8 +1,8 @@
-// One message on screen. A user message is a bubble; an answer is a glass card that fills in as the
+// One message on screen. A user message is a bubble; an answer is a card that fills in as the
 // stream arrives: intent badge, search steps, a live status line, the markdown body, sources, warnings,
 // and a footer (timing, "watching", copy). A nudge is the same card in its "right moment" style.
 import { copyText, h } from "../dom.js";
-import { ICONS } from "../icons.js";
+import { CAT, ICONS } from "../icons.js";
 import { markdown } from "../markdown.js";
 import { renderSources } from "./sources.js";
 import { createSteps } from "./steps.js";
@@ -41,8 +41,8 @@ export function assistantMessage(msg = {}, opts = {}) {
   const sourcesEl = h("div", { class: "sources", hidden: true });
   const warnings = h("div", { class: "warnings" });
   const foot = h("footer", { class: "msg-foot", hidden: true });
-  const card = h("div", { class: "card glass" }, head, steps.el, status, body, sourcesEl, warnings, foot);
-  const el = h("article", { class: "msg msg-assistant", "aria-label": "minimi answered" }, h("span", { class: "orb orb-small", "aria-hidden": "true" }), card);
+  const card = h("div", { class: "card" }, head, steps.el, status, body, sourcesEl, warnings, foot);
+  const el = h("article", { class: "msg msg-assistant", "aria-label": "minimi answered" }, h("span", { class: "avatar", "aria-hidden": "true", html: CAT }), card);
 
   copyBtn.addEventListener("click", async () => {
     const ok = await copyText(text.trim());
