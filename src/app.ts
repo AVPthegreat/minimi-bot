@@ -324,8 +324,10 @@ function createSingleUserApp(config: Config): App {
       watch: config.watchEnabled,
     }),
   };
+  // Local, but still a browser page: the same CSP and headers as the demo (another site can't frame or script it).
+  const secure = securityHeaders();
   return {
-    handle: handler(mode),
+    handle: handler(mode, (_req, res) => (secure(res, false), true)),
     config,
     demo: null,
     async close() {
@@ -345,14 +347,43 @@ function createSingleUserApp(config: Config): App {
 
 const LOCAL_HINT = " The full app runs on your own machine in fake mode, no key needed: clone the repo, then run npm install and npm run dev.";
 
-/** SHA-256 hashes of index.html's inline scripts, so the CSP can allow exactly those and nothing else. */
+/** SHA-256 hashes of the pages' inline scripts (the theme snippet), so the CSP can allow exactly those and nothing else. */
 function inlineScriptHashes(): string[] {
-  try {
-    const html = readFileSync(join(PUBLIC, "index.html"), "utf8");
-    return [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((mm) => `'sha256-${createHash("sha256").update(mm[1] ?? "").digest("base64")}'`);
-  } catch {
-    return [];
+  const hashes = new Set<string>();
+  for (const pagePath of ["index.html", join("report", "index.html")]) {
+    try {
+      const html = readFileSync(join(PUBLIC, pagePath), "utf8");
+      for (const mm of html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) hashes.add(`'sha256-${createHash("sha256").update(mm[1] ?? "").digest("base64")}'`);
+    } catch {
+      /* a missing page needs no hash */
+    }
   }
+  return [...hashes];
+}
+
+/** The same security headers in both modes: our own origin only, no framing, no sniffing, no referrer. */
+function securityHeaders(): (res: ServerResponse, https: boolean) => void {
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' ${inlineScriptHashes().join(" ")}`.trim(),
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+  return (res, https) => {
+    res.setHeader("content-security-policy", csp);
+    res.setHeader("x-content-type-options", "nosniff");
+    res.setHeader("referrer-policy", "no-referrer");
+    res.setHeader("x-frame-options", "DENY");
+    res.setHeader("cross-origin-opener-policy", "same-origin");
+    res.setHeader("permissions-policy", "camera=(), microphone=(), geolocation=()");
+    if (https) res.setHeader("strict-transport-security", "max-age=31536000");
+  };
 }
 
 function page(title: string, body: string): string {
@@ -385,18 +416,7 @@ function createDemoApp(config: Config, demo: DemoConfig): App {
   const ipRequests = new TokenBuckets(demo.ipRequestsPerMin, demo.ipRequestsPerMin);
   const load = { streams: 0 }; // answers and nudges running now
 
-  const csp = [
-    "default-src 'self'",
-    `script-src 'self' ${inlineScriptHashes().join(" ")}`.trim(),
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
-    "font-src 'self'",
-    "connect-src 'self'",
-    "object-src 'none'",
-    "base-uri 'none'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-  ].join("; ");
+  const secure = securityHeaders();
 
   // Per request: who is this (set by `before`, read by `ctx`). WeakMap so nothing leaks between requests.
   const who = new WeakMap<IncomingMessage, { id: string; https: boolean }>();
@@ -536,14 +556,8 @@ function createDemoApp(config: Config, demo: DemoConfig): App {
 
   /** Security headers, access code and the visitor cookie. Returns false when it already answered. */
   function before(req: IncomingMessage, res: ServerResponse): boolean {
-    res.setHeader("content-security-policy", csp);
-    res.setHeader("x-content-type-options", "nosniff");
-    res.setHeader("referrer-policy", "no-referrer");
-    res.setHeader("x-frame-options", "DENY");
-    res.setHeader("cross-origin-opener-policy", "same-origin");
-    res.setHeader("permissions-policy", "camera=(), microphone=(), geolocation=()");
     const https = isHttps(req);
-    if (https) res.setHeader("strict-transport-security", "max-age=31536000");
+    secure(res, https);
 
     const url = new URL(req.url ?? "/", "http://localhost");
     const ip = clientIp(req);

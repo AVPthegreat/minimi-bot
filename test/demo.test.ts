@@ -115,13 +115,21 @@ test("cookie: signed ids verify, tampered or foreign ones don't, the previous se
   assert.deepEqual(verifyVisitor(signVisitor(id, "old-secret-old-secret-old-secret-00"), [SECRET, "old-secret-old-secret-old-secret-00"]), { id, resign: true });
 });
 
-test("demo off: the single-user app as before (same health fields, no cookie, no demo headers)", async () => {
+test("demo off: the single-user app as before (same health fields, no cookie), with the same security headers", async () => {
   const s = await start(null);
   const b = browser(s.base);
   const h = await b.json("/api/health");
   assert.deepEqual(Object.keys(h.data).sort(), ["clockSettable", "fake", "fakeReason", "model", "now", "nowLabel", "ok", "search", "timezone", "watch"].sort());
   assert.equal(h.headers.get("set-cookie"), null);
-  assert.equal(h.headers.get("content-security-policy"), null);
+  for (const res of [h, await b.call("/"), await b.call("/report/")]) {
+    const csp = res.headers.get("content-security-policy") ?? "";
+    assert.match(csp, /default-src 'self'/);
+    assert.match(csp, /frame-ancestors 'none'/);
+    assert.match(csp, /script-src 'self' 'sha256-/); // the pages' inline theme script, by hash
+    assert.equal(res.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(res.headers.get("x-frame-options"), "DENY");
+    assert.equal(res.headers.get("referrer-policy"), "no-referrer");
+  }
   assert.equal((await b.call("/api/demo/status")).status, 404);
   const r = await b.chat("x".repeat(3000)); // no demo length cap (the agent's own 4,000 applies)
   assert.equal(r.status, 200);
