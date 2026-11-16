@@ -55,6 +55,8 @@ export interface PublicSource {
   domain: string;
   date?: string;
   official: boolean;
+  /** A short line from the page, for the source card. */
+  quote?: string;
 }
 
 export interface Timings {
@@ -483,7 +485,14 @@ function sameQuery(a: string, b: string): boolean {
 }
 
 function publicSource(s: Source): PublicSource {
-  return { n: s.n, title: s.title, url: s.url, domain: s.domain, date: s.publishedDate, official: s.official };
+  const quote = s.snippet?.trim() === s.title.trim() ? "" : quoteOf(s.snippet);
+  return { n: s.n, title: s.title, url: s.url, domain: s.domain, date: s.publishedDate, official: s.official, ...(quote ? { quote } : {}) };
+}
+
+/** A short line from the page for the source card (shown as plain text, never as instructions or HTML). */
+function quoteOf(snippet: string | undefined): string {
+  const flat = (snippet ?? "").replace(/^[\s>*•-]+/gm, " ").replace(/\s+/g, " ").trim();
+  return flat.length > 160 ? `${flat.slice(0, 157).replace(/\s+\S*$/, "")}…` : flat;
 }
 
 /** For "anything new?": the questions the tracked facts came from (most recent first, max 3). */

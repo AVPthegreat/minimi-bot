@@ -65,8 +65,11 @@ errors; `state.js` is one observable store; `chat.js` turns stream events into v
 character before adding its own tags. The stream carries typed `search` events (query, running/done/failed/cancelled,
 result count, the product's site) next to the old status lines, so older clients still work. Logos come from our own
 `GET /api/logo` (`src/logo.ts`): fetched server-side over https from public addresses only (checked at connect time),
-sniffed as raster images, size/time capped, cached in memory and on disk, a letter tile otherwise. Glass panels fall
-back to solid under `prefers-reduced-transparency` or without `backdrop-filter`; text tokens pass AA on the worst-case aurora.
+sniffed as raster images, size/time capped, cached in memory and on disk, a letter tile otherwise. The look follows
+minimi's own site: a white app window on a warm dune backdrop, near-black text, black buttons, pill chips, sources as
+app-panel items (site · date, bold title, grey quote line), one orange accent; dark is near-black with a faint purple glow.
+Text tokens pass WCAG AA on their surfaces (ratios in `public/css/tokens.css`); the window turns solid under
+`prefers-reduced-transparency`. The Report page (`/report`) draws `public/report/data.json`, built by `npm run report`.
 
 **Hosted demo** (`DEMO_MODE=1`, `src/app.ts` + `src/demo/`; off = the single-user app, same routes). Each route asks
 `ctx(req)` for the caller's agent: a random 128-bit visitor id in an HMAC-signed HttpOnly cookie maps to that visitor's

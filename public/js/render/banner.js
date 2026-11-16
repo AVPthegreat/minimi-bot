@@ -3,12 +3,12 @@ import { h } from "../dom.js";
 
 export function renderBanner(slot, { serverError, online }, retry) {
   if (!online) {
-    slot.replaceChildren(h("div", { class: "banner glass", role: "alert", icon: "offline" }, h("span", {}, "You're offline. Messages will send again once the connection is back.")));
+    slot.replaceChildren(h("div", { class: "banner", role: "alert", icon: "offline" }, h("span", {}, "You're offline. Messages will send again once the connection is back.")));
     return;
   }
   if (serverError) {
     slot.replaceChildren(
-      h("div", { class: "banner glass", role: "alert", icon: "warn" },
+      h("div", { class: "banner", role: "alert", icon: "warn" },
         h("span", {}, serverError, " Start it with ", h("code", {}, "npm run dev"), "."),
         h("button", { class: "btn btn-small", type: "button", icon: "retry", onclick: retry }, "Try again")),
     );

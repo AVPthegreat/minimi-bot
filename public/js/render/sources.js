@@ -1,4 +1,5 @@
-// Sources under an answer: cards with the site's logo, the page title, the date and an "Official" mark.
+// Sources under an answer, laid out like minimi's app panel: logo + site · date on one line, the page
+// title in bold, then a grey "Source: ..." line from the page, with thin dividers. An "Official" mark.
 // The numbers match the [n] citations in the text. Only http(s) links are shown.
 import { h } from "../dom.js";
 import { safeUrl } from "../markdown.js";
@@ -14,9 +15,14 @@ export function renderSources(container, sources) {
   const cards = list.map((s, i) =>
     h("li", { class: i >= VISIBLE ? "more" : null },
       h("a", { class: "source", href: safeUrl(s.url), target: "_blank", rel: "noopener noreferrer", title: s.title || s.domain },
-        h("span", { class: "source-top" }, logo(s.domain, s.domain), h("span", { class: "source-domain" }, s.domain), h("span", { class: "source-n", "aria-label": `source ${s.n}` }, String(s.n))),
+        h("span", { class: "source-top" },
+          h("span", { class: "source-n", "aria-label": `source ${s.n}` }, String(s.n)),
+          logo(s.domain, s.domain),
+          h("span", { class: "source-domain" }, s.domain),
+          s.official ? h("span", { class: "badge badge-official" }, "Official") : null,
+          h("span", { class: "source-date" }, s.date || "undated")),
         h("span", { class: "source-title" }, s.title || s.url),
-        h("span", { class: "source-meta" }, s.official ? h("span", { class: "badge badge-official" }, "Official") : null, s.date ? h("span", {}, s.date) : null),
+        s.quote ? h("span", { class: "source-quote" }, `Source: "${s.quote}"`) : null,
       ),
     ),
   );
